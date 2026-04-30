@@ -22,7 +22,7 @@ async function relationalQuery(websiteId: string, filters: QueryFilters) {
       websiteId,
     });
 
-  // Group by the timestamp bucket (8-byte timestamptz) and format only on the
+  // Group by the timestamp bucket (8 byte timestamptz) and format only on the
   // outer projection. Sorting/aggregating on the to_char output is several×
   // slower because the sort key becomes a 19-char varchar.
   return rawQuery(

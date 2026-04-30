@@ -30,7 +30,7 @@ async function relationalQuery(websiteId: string, filters: QueryFilters) {
            or device ilike {{search}})`
     : '';
 
-  // Fast path skips the eager join of `session` (16k rows on the demo dataset)
+  // Fast path skips the eager join of `session` (16K rows on the demo dataset)
   // and the eager aggregation of every event in the window. We can use it when
   // no filter or search references session columns — the only reason the
   // session table needs to be visible during aggregation/filtering.
