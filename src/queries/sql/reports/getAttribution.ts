@@ -101,122 +101,126 @@ async function relationalQuery(
     group by e.session_id)`;
   }
 
-  const referrerRes = await rawQuery(
-    `
-    ${eventQuery}
-    ${getModelQuery(model)}
-    select coalesce(we.referrer_domain, '') as "name",
-        count(distinct we.session_id) value
-    from model m
-    join website_event we
-    on we.created_at = m.created_at
-        and we.session_id = m.session_id
-    join session s
-    on s.session_id = m.session_id
-    where we.website_id = {{websiteId::uuid}}
-          and we.created_at between {{startDate}} and {{endDate}}
-          and we.referrer_domain != regexp_replace(we.hostname, '^www.', '')
-          and we.referrer_domain != ''
-    group by 1
-    order by 2 desc
-    limit 20
-    `,
-    queryParams,
-  );
+  const [
+    referrerRes,
+    paidAdsres,
+    sourceRes,
+    mediumRes,
+    campaignRes,
+    contentRes,
+    termRes,
+    totalRes,
+  ] = await Promise.all([
+    rawQuery(
+      `
+      ${eventQuery}
+      ${getModelQuery(model)}
+      select coalesce(we.referrer_domain, '') as "name",
+          count(distinct we.session_id) value
+      from model m
+      join website_event we
+      on we.created_at = m.created_at
+          and we.session_id = m.session_id
+      join session s
+      on s.session_id = m.session_id
+      where we.website_id = {{websiteId::uuid}}
+            and we.created_at between {{startDate}} and {{endDate}}
+            and we.referrer_domain != regexp_replace(we.hostname, '^www.', '')
+            and we.referrer_domain != ''
+      group by 1
+      order by 2 desc
+      limit 20
+      `,
+      queryParams,
+    ),
+    rawQuery(
+      `
+      ${eventQuery}
+      ${getModelQuery(model)},
 
-  const paidAdsres = await rawQuery(
-    `
-    ${eventQuery}
-    ${getModelQuery(model)},
-
-    results AS (
-    select case
-            when coalesce(gclid, '') != '' then 'Google Ads'
-            when coalesce(fbclid, '') != '' then 'Facebook / Meta'
-            when coalesce(msclkid, '') != '' then 'Microsoft Ads'
-            when coalesce(ttclid, '') != '' then 'TikTok Ads'
-            when coalesce(li_fat_id, '') != '' then 'LinkedIn Ads'
-            when coalesce(twclid, '') != '' then 'Twitter Ads (X)'
-            else ''
-          end as "name",
-        count(distinct we.session_id) as "value"
-    from model m
-    join website_event we
-    on we.created_at = m.created_at
-        and we.session_id = m.session_id
-    where we.website_id = {{websiteId::uuid}}
-          and we.created_at between {{startDate}} and {{endDate}}
-    group by 1
-    order by 2 desc
-    limit 20)
-    SELECT *
-    FROM results
-    WHERE name != ''
-    `,
-    queryParams,
-  );
-
-  const sourceRes = await rawQuery(
-    `
-    ${eventQuery}
-    ${getModelQuery(model)}
-    ${getUTMQuery('utm_source')}
-    `,
-    queryParams,
-  );
-
-  const mediumRes = await rawQuery(
-    `
-    ${eventQuery}
-    ${getModelQuery(model)}
-    ${getUTMQuery('utm_medium')}
-    `,
-    queryParams,
-  );
-
-  const campaignRes = await rawQuery(
-    `
-    ${eventQuery}
-    ${getModelQuery(model)}
-    ${getUTMQuery('utm_campaign')}
-    `,
-    queryParams,
-  );
-
-  const contentRes = await rawQuery(
-    `
-    ${eventQuery}
-    ${getModelQuery(model)}
-    ${getUTMQuery('utm_content')}
-    `,
-    queryParams,
-  );
-
-  const termRes = await rawQuery(
-    `
-    ${eventQuery}
-    ${getModelQuery(model)}
-    ${getUTMQuery('utm_term')}
-    `,
-    queryParams,
-  );
-
-  const totalRes = await rawQuery(
-    `
-    select
-        count(*) as "pageviews",
-        count(distinct website_event.session_id) as "visitors",
-        count(distinct website_event.visit_id) as "visits"
-    from website_event
-    ${joinSessionQuery}
-    ${cohortQuery}
-    where website_event.website_id = {{websiteId::uuid}}
-        and website_event.created_at between {{startDate}} and {{endDate}}
-        and website_event.${column} = {{step}}
-        ${filterQuery}
-    `,
-    queryParams,
-  ).then(result => result?.[0]);
+      results AS (
+      select case
+              when coalesce(gclid, '') != '' then 'Google Ads'
+              when coalesce(fbclid, '') != '' then 'Facebook / Meta'
+              when coalesce(msclkid, '') != '' then 'Microsoft Ads'
+              when coalesce(ttclid, '') != '' then 'TikTok Ads'
+              when coalesce(li_fat_id, '') != '' then 'LinkedIn Ads'
+              when coalesce(twclid, '') != '' then 'Twitter Ads (X)'
+              else ''
+            end as "name",
+          count(distinct we.session_id) as "value"
+      from model m
+      join website_event we
+      on we.created_at = m.created_at
+          and we.session_id = m.session_id
+      where we.website_id = {{websiteId::uuid}}
+            and we.created_at between {{startDate}} and {{endDate}}
+      group by 1
+      order by 2 desc
+      limit 20)
+      SELECT *
+      FROM results
+      WHERE name != ''
+      `,
+      queryParams,
+    ),
+    rawQuery(
+      `
+      ${eventQuery}
+      ${getModelQuery(model)}
+      ${getUTMQuery('utm_source')}
+      `,
+      queryParams,
+    ),
+    rawQuery(
+      `
+      ${eventQuery}
+      ${getModelQuery(model)}
+      ${getUTMQuery('utm_medium')}
+      `,
+      queryParams,
+    ),
+    rawQuery(
+      `
+      ${eventQuery}
+      ${getModelQuery(model)}
+      ${getUTMQuery('utm_campaign')}
+      `,
+      queryParams,
+    ),
+    rawQuery(
+      `
+      ${eventQuery}
+      ${getModelQuery(model)}
+      ${getUTMQuery('utm_content')}
+      `,
+      queryParams,
+    ),
+    rawQuery(
+      `
+      ${eventQuery}
+      ${getModelQuery(model)}
+      ${getUTMQuery('utm_term')}
+      `,
+      queryParams,
+    ),
+    rawQuery(
+      `
+      select
+          count(*) as "pageviews",
+          count(distinct website_event.session_id) as "visitors",
+          count(distinct website_event.visit_id) as "visits"
+      from website_event
+      ${joinSessionQuery}
+      ${cohortQuery}
+      where website_event.website_id = {{websiteId::uuid}}
+          and website_event.created_at between {{startDate}} and {{endDate}}
+          and website_event.${column} = {{step}}
+          ${filterQuery}
+      `,
+      queryParams,
+    ).then(result => result?.[0]),
+  ]);
 
   return {
     referrer: referrerRes,
@@ -312,153 +316,157 @@ async function clickhouseQuery(
           ${filterQuery}
         group by 1),`;
 
-  const referrerRes = await rawQuery<
-    {
-      name: string;
-      value: number;
-    }[]
-  >(
-    `
-    ${eventQuery}
-    ${getModelQuery(model)}
-    select we.referrer_domain name,
-        uniqExact(we.session_id) value
-    from model m
-    join (
-      select *
+  const [
+    referrerRes,
+    paidAdsres,
+    sourceRes,
+    mediumRes,
+    campaignRes,
+    contentRes,
+    termRes,
+    totalRes,
+  ] = await Promise.all([
+    rawQuery<
+      {
+        name: string;
+        value: number;
+      }[]
+    >(
+      `
+      ${eventQuery}
+      ${getModelQuery(model)}
+      select we.referrer_domain name,
+          uniqExact(we.session_id) value
+      from model m
+      join (
+        select *
+        from website_event
+        where website_id = {websiteId:UUID}
+          and created_at between {startDate:DateTime64} and {endDate:DateTime64}
+      ) we
+      on we.created_at = m.created_at
+          and we.session_id = m.session_id
+      where we.referrer_domain != hostname
+        and we.referrer_domain != ''
+      group by 1
+      order by 2 desc
+      limit 20
+      `,
+      queryParams,
+    ),
+    rawQuery<
+      {
+        name: string;
+        value: number;
+      }[]
+    >(
+      `
+      ${eventQuery}
+      ${getModelQuery(model)}
+      select multiIf(gclid != '', 'Google Ads',
+                     fbclid != '', 'Facebook / Meta',
+                     msclkid != '', 'Microsoft Ads',
+                     ttclid != '', 'TikTok Ads',
+                     li_fat_id != '', 'LinkedIn Ads',
+                     twclid != '', 'Twitter Ads (X)','') name,
+          uniqExact(we.session_id) value
+      from model m
+      join (
+        select *
+        from website_event
+        where website_id = {websiteId:UUID}
+          and created_at between {startDate:DateTime64} and {endDate:DateTime64}
+      ) we
+      on we.created_at = m.created_at
+          and we.session_id = m.session_id
+      where name != ''
+      group by 1
+      order by 2 desc
+      limit 20
+      `,
+      queryParams,
+    ),
+    rawQuery<
+      {
+        name: string;
+        value: number;
+      }[]
+    >(
+      `
+      ${eventQuery}
+      ${getModelQuery(model)}
+      ${getUTMQuery('utm_source')}
+      `,
+      queryParams,
+    ),
+    rawQuery<
+      {
+        name: string;
+        value: number;
+      }[]
+    >(
+      `
+      ${eventQuery}
+      ${getModelQuery(model)}
+      ${getUTMQuery('utm_medium')}
+      `,
+      queryParams,
+    ),
+    rawQuery<
+      {
+        name: string;
+        value: number;
+      }[]
+    >(
+      `
+      ${eventQuery}
+      ${getModelQuery(model)}
+      ${getUTMQuery('utm_campaign')}
+      `,
+      queryParams,
+    ),
+    rawQuery<
+      {
+        name: string;
+        value: number;
+      }[]
+    >(
+      `
+      ${eventQuery}
+      ${getModelQuery(model)}
+      ${getUTMQuery('utm_content')}
+      `,
+      queryParams,
+    ),
+    rawQuery<
+      {
+        name: string;
+        value: number;
+      }[]
+    >(
+      `
+      ${eventQuery}
+      ${getModelQuery(model)}
+      ${getUTMQuery('utm_term')}
+      `,
+      queryParams,
+    ),
+    rawQuery<{ pageviews: number; visitors: number; visits: number }>(
+      `
+      select
+          count(*) as "pageviews",
+          uniqExact(session_id) as "visitors",
+          uniqExact(visit_id) as "visits"
       from website_event
+      ${cohortQuery}
       where website_id = {websiteId:UUID}
-        and created_at between {startDate:DateTime64} and {endDate:DateTime64}
-    ) we
-    on we.created_at = m.created_at
-        and we.session_id = m.session_id
-    where we.referrer_domain != hostname
-      and we.referrer_domain != ''
-    group by 1
-    order by 2 desc
-    limit 20
-    `,
-    queryParams,
-  );
-
-  const paidAdsres = await rawQuery<
-    {
-      name: string;
-      value: number;
-    }[]
-  >(
-    `
-    ${eventQuery}
-    ${getModelQuery(model)}
-    select multiIf(gclid != '', 'Google Ads',
-                   fbclid != '', 'Facebook / Meta',
-                   msclkid != '', 'Microsoft Ads',
-                   ttclid != '', 'TikTok Ads',
-                   li_fat_id != '', 'LinkedIn Ads',
-                   twclid != '', 'Twitter Ads (X)','') name,
-        uniqExact(we.session_id) value
-    from model m
-    join (
-      select *
-      from website_event
-      where website_id = {websiteId:UUID}
-        and created_at between {startDate:DateTime64} and {endDate:DateTime64}
-    ) we
-    on we.created_at = m.created_at
-        and we.session_id = m.session_id
-    where name != ''
-    group by 1
-    order by 2 desc
-    limit 20
-    `,
-    queryParams,
-  );
-
-  const sourceRes = await rawQuery<
-    {
-      name: string;
-      value: number;
-    }[]
-  >(
-    `
-    ${eventQuery}
-    ${getModelQuery(model)}
-    ${getUTMQuery('utm_source')}
-    `,
-    queryParams,
-  );
-
-  const mediumRes = await rawQuery<
-    {
-      name: string;
-      value: number;
-    }[]
-  >(
-    `
-    ${eventQuery}
-    ${getModelQuery(model)}
-    ${getUTMQuery('utm_medium')}
-    `,
-    queryParams,
-  );
-
-  const campaignRes = await rawQuery<
-    {
-      name: string;
-      value: number;
-    }[]
-  >(
-    `
-    ${eventQuery}
-    ${getModelQuery(model)}
-    ${getUTMQuery('utm_campaign')}
-    `,
-    queryParams,
-  );
-
-  const contentRes = await rawQuery<
-    {
-      name: string;
-      value: number;
-    }[]
-  >(
-    `
-    ${eventQuery}
-    ${getModelQuery(model)}
-    ${getUTMQuery('utm_content')}
-    `,
-    queryParams,
-  );
-
-  const termRes = await rawQuery<
-    {
-      name: string;
-      value: number;
-    }[]
-  >(
-    `
-    ${eventQuery}
-    ${getModelQuery(model)}
-    ${getUTMQuery('utm_term')}
-    `,
-    queryParams,
-  );
-
-  const totalRes = await rawQuery<{ pageviews: number; visitors: number; visits: number }>(
-    `
-    select 
-        count(*) as "pageviews",
-        uniqExact(session_id) as "visitors",
-        uniqExact(visit_id) as "visits"
-    from website_event
-    ${cohortQuery}
-    where website_id = {websiteId:UUID}
-        and created_at between {startDate:DateTime64} and {endDate:DateTime64}
-        and ${column} = {step:String}
-        ${filterQuery}
-    `,
-    queryParams,
-  ).then(result => result?.[0]);
+          and created_at between {startDate:DateTime64} and {endDate:DateTime64}
+          and ${column} = {step:String}
+          ${filterQuery}
+      `,
+      queryParams,
+    ).then(result => result?.[0]),
+  ]);
 
   return {
     referrer: referrerRes,
