@@ -47,12 +47,22 @@ function getCastColumnQuery(field: string, type: string): string {
   return `${field}::${type}`;
 }
 
-function getDateSQL(field: string, unit: string, timezone?: string): string {
+function getDateTruncSQL(field: string, unit: string, timezone?: string): string {
   if (timezone && timezone !== 'utc') {
-    return `to_char(date_trunc('${unit}', ${field} at time zone '${timezone}'), '${DATE_FORMATS[unit]}')`;
+    return `date_trunc('${unit}', ${field} at time zone '${timezone}')`;
   }
 
-  return `to_char(date_trunc('${unit}', ${field}), '${DATE_FORMATS_UTC[unit]}')`;
+  return `date_trunc('${unit}', ${field})`;
+}
+
+function getDateFormatSQL(expr: string, unit: string, timezone?: string): string {
+  const fmt = timezone && timezone !== 'utc' ? DATE_FORMATS[unit] : DATE_FORMATS_UTC[unit];
+
+  return `to_char(${expr}, '${fmt}')`;
+}
+
+function getDateSQL(field: string, unit: string, timezone?: string): string {
+  return getDateFormatSQL(getDateTruncSQL(field, unit, timezone), unit, timezone);
 }
 
 function getDateWeeklySQL(field: string, timezone?: string) {
@@ -424,6 +434,8 @@ export default {
   getCastColumnQuery,
   getDayDiffQuery,
   getDateSQL,
+  getDateTruncSQL,
+  getDateFormatSQL,
   getDateWeeklySQL,
   getFilterQuery,
   getSearchParameters,

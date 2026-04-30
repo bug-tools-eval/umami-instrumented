@@ -27,7 +27,7 @@ async function relationalQuery(
   filters: QueryFilters,
 ) {
   const { startDate, endDate, unit = 'day', timezone = 'utc', currency } = parameters;
-  const { getDateSQL, rawQuery, parseFilters } = prisma;
+  const { getDateTruncSQL, getDateFormatSQL, rawQuery, parseFilters } = prisma;
   const { queryParams, filterQuery, cohortQuery, joinSessionQuery } = parseFilters({
     ...filters,
     websiteId,
@@ -50,20 +50,22 @@ async function relationalQuery(
 
   const chart = await rawQuery(
     `
-    select
-      revenue.event_name x,
-      ${getDateSQL('revenue.created_at', unit, timezone)} t,
-      sum(revenue.revenue) y,
-      count(revenue.event_id) count
-    from revenue
-    ${joinQuery}
-    ${cohortQuery}
-    ${joinSessionQuery}
-    where revenue.website_id = {{websiteId::uuid}}
-      and revenue.created_at between {{startDate}} and {{endDate}}
-      and upper(revenue.currency) = {{currency}}
-      ${filterQuery}
-    group by  x, t
+    select x, ${getDateFormatSQL('t', unit, timezone)} t, y, count
+    from (
+      select revenue.event_name x,
+        ${getDateTruncSQL('revenue.created_at', unit, timezone)} t,
+        sum(revenue.revenue) y,
+        count(revenue.event_id) count
+      from revenue
+      ${joinQuery}
+      ${cohortQuery}
+      ${joinSessionQuery}
+      where revenue.website_id = {{websiteId::uuid}}
+        and revenue.created_at between {{startDate}} and {{endDate}}
+        and upper(revenue.currency) = {{currency}}
+        ${filterQuery}
+      group by x, t
+    ) g
     order by t
     `,
     queryParams,

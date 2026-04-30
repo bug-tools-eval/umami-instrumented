@@ -15,28 +15,33 @@ export async function getPageviewStats(...args: [websiteId: string, filters: Que
 
 async function relationalQuery(websiteId: string, filters: QueryFilters) {
   const { timezone = 'utc', unit = 'day' } = filters;
-  const { getDateSQL, parseFilters, rawQuery } = prisma;
+  const { getDateTruncSQL, getDateFormatSQL, parseFilters, rawQuery } = prisma;
   const { filterQuery, cohortQuery, excludeBounceQuery, joinSessionQuery, queryParams } =
     parseFilters({
       ...filters,
       websiteId,
     });
 
+  // Group by the timestamp bucket (8-byte timestamptz) and format only on the
+  // outer projection. Sorting/aggregating on the to_char output is several×
+  // slower because the sort key becomes a 19-char varchar.
   return rawQuery(
     `
-    select
-      ${getDateSQL('website_event.created_at', unit, timezone)} x,
-      count(*) y
-    from website_event
-    ${cohortQuery}
-    ${excludeBounceQuery}
-    ${joinSessionQuery}  
-    where website_event.website_id = {{websiteId::uuid}}
-      and website_event.created_at between {{startDate}} and {{endDate}}
-      and website_event.event_type NOT IN (2, 5)
-      ${filterQuery}
-    group by 1
-    order by 1
+    select ${getDateFormatSQL('t', unit, timezone)} x, y
+    from (
+      select ${getDateTruncSQL('website_event.created_at', unit, timezone)} t,
+        count(*) y
+      from website_event
+      ${cohortQuery}
+      ${excludeBounceQuery}
+      ${joinSessionQuery}
+      where website_event.website_id = {{websiteId::uuid}}
+        and website_event.created_at between {{startDate}} and {{endDate}}
+        and website_event.event_type NOT IN (2, 5)
+        ${filterQuery}
+      group by t
+    ) g
+    order by t
     `,
     queryParams,
     FUNCTION_NAME,

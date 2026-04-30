@@ -38,34 +38,41 @@ async function relationalQuery(
   filters: QueryFilters,
 ): Promise<PerformanceResult> {
   const { startDate, endDate, unit = 'day', timezone = 'utc', metric = 'lcp' } = parameters;
-  const { getDateSQL, rawQuery, parseFilters } = prisma;
+  const { getDateTruncSQL, getDateFormatSQL, rawQuery, parseFilters } = prisma;
   const { filterQuery, joinSessionQuery, cohortQuery, queryParams } = parseFilters({
     ...filters,
     websiteId,
   });
 
-  const chart = await rawQuery(
-    `
-    select
-      ${getDateSQL('created_at', unit, timezone)} t,
-      percentile_cont(0.5) within group (order by ${metric}) as p50,
-      percentile_cont(0.75) within group (order by ${metric}) as p75,
-      percentile_cont(0.95) within group (order by ${metric}) as p95
-    from website_event
-    ${cohortQuery}
-    ${joinSessionQuery}
-    where website_event.website_id = {{websiteId::uuid}}
-      and website_event.event_type = 5
-      and website_event.created_at between {{startDate}} and {{endDate}}
-      ${filterQuery}
-    group by t
+  // Run chart and summary in parallel — both scan the same filtered rows but
+  // the prior sequential awaits doubled wall-clock for a request that has no
+  // result-dependency between them. Chart additionally moves the date format
+  // to the outer projection so the GROUP BY / sort keys stay 8-byte
+  // timestamptz instead of a 19-char varchar.
+  const [chart, summaryResult] = await Promise.all([
+    rawQuery(
+      `
+    select ${getDateFormatSQL('t', unit, timezone)} t, p50, p75, p95
+    from (
+      select ${getDateTruncSQL('created_at', unit, timezone)} t,
+        percentile_cont(0.5) within group (order by ${metric}) as p50,
+        percentile_cont(0.75) within group (order by ${metric}) as p75,
+        percentile_cont(0.95) within group (order by ${metric}) as p95
+      from website_event
+      ${cohortQuery}
+      ${joinSessionQuery}
+      where website_event.website_id = {{websiteId::uuid}}
+        and website_event.event_type = 5
+        and website_event.created_at between {{startDate}} and {{endDate}}
+        ${filterQuery}
+      group by t
+    ) g
     order by t
     `,
-    { ...queryParams, startDate, endDate },
-  );
-
-  const summaryResult = await rawQuery(
-    `
+      { ...queryParams, startDate, endDate },
+    ),
+    rawQuery(
+      `
     select
       percentile_cont(0.5) within group (order by lcp) as lcp_p50,
       percentile_cont(0.75) within group (order by lcp) as lcp_p75,
@@ -91,8 +98,9 @@ async function relationalQuery(
       and website_event.created_at between {{startDate}} and {{endDate}}
       ${filterQuery}
     `,
-    { ...queryParams, startDate, endDate },
-  ).then(result => result?.[0]);
+      { ...queryParams, startDate, endDate },
+    ).then(result => result?.[0]),
+  ]);
 
   const summary = {
     lcp: {

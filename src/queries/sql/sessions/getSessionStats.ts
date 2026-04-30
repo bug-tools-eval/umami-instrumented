@@ -15,7 +15,7 @@ export async function getSessionStats(...args: [websiteId: string, filters: Quer
 
 async function relationalQuery(websiteId: string, filters: QueryFilters) {
   const { timezone = 'utc', unit = 'day' } = filters;
-  const { getDateSQL, parseFilters, rawQuery } = prisma;
+  const { getDateTruncSQL, getDateFormatSQL, parseFilters, rawQuery } = prisma;
   const { filterQuery, joinSessionQuery, cohortQuery, excludeBounceQuery, queryParams } =
     parseFilters({
       ...filters,
@@ -24,19 +24,21 @@ async function relationalQuery(websiteId: string, filters: QueryFilters) {
 
   return rawQuery(
     `
-    select
-      ${getDateSQL('website_event.created_at', unit, timezone)} x,
-      count(distinct website_event.session_id) y
-    from website_event
-    ${cohortQuery}
-    ${excludeBounceQuery}
-    ${joinSessionQuery}
-    where website_event.website_id = {{websiteId::uuid}}
-      and website_event.created_at between {{startDate}} and {{endDate}}
-      and website_event.event_type NOT IN (2, 5)
-      ${filterQuery}
-    group by 1
-    order by 1
+    select ${getDateFormatSQL('t', unit, timezone)} x, y
+    from (
+      select ${getDateTruncSQL('website_event.created_at', unit, timezone)} t,
+        count(distinct website_event.session_id) y
+      from website_event
+      ${cohortQuery}
+      ${excludeBounceQuery}
+      ${joinSessionQuery}
+      where website_event.website_id = {{websiteId::uuid}}
+        and website_event.created_at between {{startDate}} and {{endDate}}
+        and website_event.event_type NOT IN (2, 5)
+        ${filterQuery}
+      group by t
+    ) g
+    order by t
     `,
     queryParams,
     FUNCTION_NAME,

@@ -31,7 +31,7 @@ async function relationalQuery(
 ) {
   const { limit } = parameters;
   const { timezone = 'utc', unit = 'day' } = filters;
-  const { rawQuery, getDateSQL, parseFilters } = prisma;
+  const { rawQuery, getDateTruncSQL, getDateFormatSQL, parseFilters } = prisma;
   const { filterQuery, cohortQuery, joinSessionQuery, queryParams } = parseFilters({
     ...filters,
     websiteId,
@@ -52,20 +52,22 @@ async function relationalQuery(
 
   return rawQuery(
     `
-    select
-      event_name x,
-      ${getDateSQL('website_event.created_at', unit, timezone)} t,
-      count(*) y
-    from website_event
-    ${cohortQuery}
-    ${joinSessionQuery}
-    where website_event.website_id = {{websiteId::uuid}}
-      and website_event.created_at between {{startDate}} and {{endDate}}
-      and website_event.event_type = 2
-      ${filterQuery}
-      ${limitQuery}
-    group by 1, 2
-    order by 2
+    select x, ${getDateFormatSQL('t', unit, timezone)} t, y
+    from (
+      select event_name x,
+        ${getDateTruncSQL('website_event.created_at', unit, timezone)} t,
+        count(*) y
+      from website_event
+      ${cohortQuery}
+      ${joinSessionQuery}
+      where website_event.website_id = {{websiteId::uuid}}
+        and website_event.created_at between {{startDate}} and {{endDate}}
+        and website_event.event_type = 2
+        ${filterQuery}
+        ${limitQuery}
+      group by x, t
+    ) g
+    order by t
     `,
     queryParams,
     FUNCTION_NAME,

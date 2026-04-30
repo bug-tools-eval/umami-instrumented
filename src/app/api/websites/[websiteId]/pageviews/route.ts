@@ -3,7 +3,7 @@ import { getQueryFilters, parseRequest } from '@/lib/request';
 import { json, unauthorized } from '@/lib/response';
 import { filterParams, withDateRange } from '@/lib/schema';
 import { canViewWebsite } from '@/permissions';
-import { getPageviewStats, getSessionStats } from '@/queries/sql';
+import { getPageviewAndSessionStats } from '@/queries/sql';
 
 export async function GET(
   request: Request,
@@ -27,11 +27,6 @@ export async function GET(
 
   const filters = await getQueryFilters(query, websiteId);
 
-  const [pageviews, sessions] = await Promise.all([
-    getPageviewStats(websiteId, filters),
-    getSessionStats(websiteId, filters),
-  ]);
-
   if (filters.compare) {
     const { startDate: compareStartDate, endDate: compareEndDate } = getCompareDate(
       filters.compare,
@@ -39,13 +34,9 @@ export async function GET(
       filters.endDate,
     );
 
-    const [comparePageviews, compareSessions] = await Promise.all([
-      getPageviewStats(websiteId, {
-        ...filters,
-        startDate: compareStartDate,
-        endDate: compareEndDate,
-      }),
-      getSessionStats(websiteId, {
+    const [main, compare] = await Promise.all([
+      getPageviewAndSessionStats(websiteId, filters),
+      getPageviewAndSessionStats(websiteId, {
         ...filters,
         startDate: compareStartDate,
         endDate: compareEndDate,
@@ -53,18 +44,20 @@ export async function GET(
     ]);
 
     return json({
-      pageviews,
-      sessions,
+      pageviews: main.pageviews,
+      sessions: main.sessions,
       startDate: filters.startDate,
       endDate: filters.endDate,
       compare: {
-        pageviews: comparePageviews,
-        sessions: compareSessions,
+        pageviews: compare.pageviews,
+        sessions: compare.sessions,
         startDate: compareStartDate,
         endDate: compareEndDate,
       },
     });
   }
+
+  const { pageviews, sessions } = await getPageviewAndSessionStats(websiteId, filters);
 
   return json({ pageviews, sessions });
 }

@@ -20,6 +20,7 @@ export * from './getValues';
 export * from './getWebsiteDateRange';
 export * from './getWebsiteStats';
 export * from './getWeeklyTraffic';
+export * from './pageviews/getPageviewAndSessionStats';
 export * from './pageviews/getPageviewExpandedMetrics';
 export * from './pageviews/getPageviewMetrics';
 export * from './pageviews/getPageviewStats';
