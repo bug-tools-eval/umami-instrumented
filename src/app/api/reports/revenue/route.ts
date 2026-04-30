@@ -23,19 +23,19 @@ export async function POST(request: Request) {
   const parameters = await setWebsiteDate(websiteId, body.parameters);
   const filters = await getQueryFilters(body.filters, websiteId);
 
-  const [{ chart }, total, metrics] = await Promise.all([
+  const { compare = 'prev' } = parameters as RevenuParameters;
+  const { startDate, endDate } = getCompareDate(compare, parameters.startDate, parameters.endDate);
+
+  const [{ chart }, total, metrics, comparison] = await Promise.all([
     getRevenue(websiteId, parameters as RevenuParameters, filters),
     getRevenueStats(websiteId, parameters as RevenuParameters, filters),
     getRevenueMetrics(websiteId, parameters as RevenuParameters, filters),
+    getRevenueStats(
+      websiteId,
+      { ...(parameters as RevenuParameters), startDate, endDate },
+      filters,
+    ),
   ]);
-
-  const { compare = 'prev' } = parameters as RevenuParameters;
-  const { startDate, endDate } = getCompareDate(compare, parameters.startDate, parameters.endDate);
-  const comparison = await getRevenueStats(
-    websiteId,
-    { ...(parameters as RevenuParameters), startDate, endDate },
-    filters,
-  );
 
   return json({ chart, total: { ...total, comparison }, ...metrics });
 }

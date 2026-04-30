@@ -27,19 +27,20 @@ export async function GET(
 
   const filters = await getQueryFilters(query, websiteId);
 
-  const data = await getWebsiteEventStats(websiteId, filters);
-
   const { startDate, endDate } = getCompareDate(
     filters.compare ?? 'prev',
     filters.startDate,
     filters.endDate,
   );
 
-  const comparison = await getWebsiteEventStats(websiteId, {
-    ...filters,
-    startDate,
-    endDate,
-  });
+  const [data, comparison] = await Promise.all([
+    getWebsiteEventStats(websiteId, filters),
+    getWebsiteEventStats(websiteId, {
+      ...filters,
+      startDate,
+      endDate,
+    }),
+  ]);
 
   return json({ data: { ...data, comparison } });
 }
