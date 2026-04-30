@@ -12,8 +12,27 @@ const ENC_POSITION = TAG_POSITION + TAG_LENGTH;
 const HASH_ALGO = 'sha512';
 const HASH_ENCODING = 'hex';
 
-const getKey = (password: string, salt: Buffer) =>
-  crypto.pbkdf2Sync(password, salt, 10000, 32, 'sha512');
+// PBKDF2 with the server secret + per-token salt. The same (secret, salt) pair
+// recurs once per request for the lifetime of a bearer token, so the derivation
+// can be memoized. LRU bounded to cap memory under churn.
+const KEY_CACHE_LIMIT = 1024;
+const keyCache = new Map<string, Buffer>();
+
+const getKey = (password: string, salt: Buffer): Buffer => {
+  const cacheKey = `${password}:${salt.toString('base64')}`;
+  const cached = keyCache.get(cacheKey);
+  if (cached !== undefined) {
+    keyCache.delete(cacheKey);
+    keyCache.set(cacheKey, cached);
+    return cached;
+  }
+  const key = crypto.pbkdf2Sync(password, salt, 10000, 32, 'sha512');
+  if (keyCache.size >= KEY_CACHE_LIMIT) {
+    keyCache.delete(keyCache.keys().next().value as string);
+  }
+  keyCache.set(cacheKey, key);
+  return key;
+};
 
 export function encrypt(value: any, secret: any) {
   const iv = crypto.randomBytes(IV_LENGTH);
