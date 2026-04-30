@@ -1,5 +1,5 @@
 import clickhouse from '@/lib/clickhouse';
-import { EVENT_COLUMNS } from '@/lib/constants';
+import { EVENT_COLUMNS, SESSION_COLUMNS } from '@/lib/constants';
 import { CLICKHOUSE, PRISMA, runQuery } from '@/lib/db';
 import prisma from '@/lib/prisma';
 import type { QueryFilters } from '@/lib/types';
@@ -32,6 +32,49 @@ async function relationalQuery(
     ...filters,
     websiteId,
   });
+
+  // Fast path: when no filter references a session column, the only reason
+  // to join `session` is to count distinct country. Splitting the work into
+  // an events-only aggregate plus a session-side EXISTS scan removes the
+  // 44k × 16k hash-join multiplication and runs both in parallel.
+  const hasSessionFilter = SESSION_COLUMNS.some(col => filters[col] != null);
+
+  if (!hasSessionFilter && !cohortQuery) {
+    const [stats, countries] = await Promise.all([
+      rawQuery(
+        `
+        select
+          count(*) as "pageviews",
+          count(distinct website_event.session_id) as "visitors",
+          count(distinct website_event.visit_id) as "visits",
+          sum(case when website_event.event_type = 2 then 1 else 0 end) as "events"
+        from website_event
+        where website_event.website_id = {{websiteId::uuid}}
+          and website_event.created_at between {{startDate}} and {{endDate}}
+          ${filterQuery}
+        `,
+        queryParams,
+        FUNCTION_NAME,
+      ).then((r: any[]) => r?.[0] ?? {}),
+      rawQuery(
+        `
+        select count(distinct s.country) as "countries"
+        from session s
+        where s.website_id = {{websiteId::uuid}}
+          and exists (
+            select 1 from website_event we
+            where we.session_id = s.session_id
+              and we.website_id = {{websiteId::uuid}}
+              and we.created_at between {{startDate}} and {{endDate}}
+          )
+        `,
+        queryParams,
+        `${FUNCTION_NAME}:countries`,
+      ).then((r: any[]) => r?.[0] ?? {}),
+    ]);
+
+    return [{ ...stats, ...countries } as WebsiteSessionStatsData];
+  }
 
   return rawQuery(
     `
