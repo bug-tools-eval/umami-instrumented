@@ -27,19 +27,18 @@ export async function GET(
 
   const filters = await getQueryFilters(query, websiteId);
 
-  const data = await getWebsiteStats(websiteId, filters);
-
   const { startDate, endDate } = getCompareDate(
     filters.compare ?? 'prev',
     filters.startDate,
     filters.endDate,
   );
 
-  const comparison = await getWebsiteStats(websiteId, {
-    ...filters,
-    startDate,
-    endDate,
-  });
+  // Main + comparison have no result-dependency between them; running them
+  // sequentially doubled wall-clock for what is two parallel-safe aggregates.
+  const [data, comparison] = await Promise.all([
+    getWebsiteStats(websiteId, filters),
+    getWebsiteStats(websiteId, { ...filters, startDate, endDate }),
+  ]);
 
   return json({ ...data, comparison });
 }
