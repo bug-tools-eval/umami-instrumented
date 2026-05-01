@@ -6,26 +6,51 @@ const languageNames = {
   'en-US': enUS,
 };
 
-export function useLanguageNames(locale) {
-  const [list, setList] = useState(languageNames[locale] || enUS);
+const languageNameRequests: Record<string, Promise<Record<string, string>>> = {};
 
-  async function loadData(locale) {
-    const { data } = await httpGet(`${process.env.basePath || ''}/intl/language/${locale}.json`);
+function loadLanguageNames(locale: string) {
+  if (!languageNameRequests[locale]) {
+    languageNameRequests[locale] = httpGet(
+      `${process.env.basePath || ''}/intl/language/${locale}.json`,
+    )
+      .then(({ data }) => {
+        if (data) {
+          languageNames[locale] = data;
 
-    if (data) {
-      languageNames[locale] = data;
-      setList(languageNames[locale]);
-    } else {
-      setList(enUS);
-    }
+          return data;
+        }
+
+        return enUS;
+      })
+      .catch(() => enUS)
+      .finally(() => {
+        delete languageNameRequests[locale];
+      });
   }
 
+  return languageNameRequests[locale];
+}
+
+export function useLanguageNames(locale: string) {
+  const [list, setList] = useState(languageNames[locale] || enUS);
+
   useEffect(() => {
-    if (!languageNames[locale]) {
-      loadData(locale);
-    } else {
+    let mounted = true;
+
+    if (languageNames[locale]) {
       setList(languageNames[locale]);
+      return;
     }
+
+    loadLanguageNames(locale).then(data => {
+      if (mounted) {
+        setList(data);
+      }
+    });
+
+    return () => {
+      mounted = false;
+    };
   }, [locale]);
 
   return { languageNames: list };

@@ -1,3 +1,4 @@
+import { useCallback, useMemo } from 'react';
 import { BROWSERS, OS_NAMES } from '@/lib/constants';
 import regions from '../../../public/iso-3166-2.json';
 import { useCountryNames } from './useCountryNames';
@@ -11,64 +12,102 @@ export function useFormat() {
   const { countryNames } = useCountryNames(locale);
   const { languageNames } = useLanguageNames(locale);
 
-  const formatOS = (value: string): string => {
+  const formatOS = useCallback((value: string): string => {
     return OS_NAMES[value] || value;
-  };
+  }, []);
 
-  const formatBrowser = (value: string): string => {
+  const formatBrowser = useCallback((value: string): string => {
     return BROWSERS[value] || value;
-  };
+  }, []);
 
-  const formatDevice = (value: string): string => {
-    return t(labels[value] || labels.unknown);
-  };
+  const formatDevice = useCallback(
+    (value: string): string => {
+      return t(labels[value] || labels.unknown);
+    },
+    [labels, t],
+  );
 
-  const formatCountry = (value: string): string => {
-    return countryNames[value] || value;
-  };
+  const formatCountry = useCallback(
+    (value: string): string => {
+      return countryNames[value] || value;
+    },
+    [countryNames],
+  );
 
-  const formatRegion = (value?: string): string => {
-    const [country] = value?.split('-') || [];
-    return regions[value] ? `${regions[value]}, ${countryNames[country]}` : value;
-  };
+  const formatRegion = useCallback(
+    (value?: string): string => {
+      const [country] = value?.split('-') || [];
+      return regions[value] ? `${regions[value]}, ${countryNames[country]}` : value;
+    },
+    [countryNames],
+  );
 
-  const formatCity = (value: string, country?: string): string => {
-    return countryNames[country] ? `${value}, ${countryNames[country]}` : value;
-  };
+  const formatCity = useCallback(
+    (value: string, country?: string): string => {
+      return countryNames[country] ? `${value}, ${countryNames[country]}` : value;
+    },
+    [countryNames],
+  );
 
-  const formatLanguage = (value: string): string => {
-    return languageNames[value?.split('-')[0]] || value;
-  };
+  const formatLanguage = useCallback(
+    (value: string): string => {
+      return languageNames[value?.split('-')[0]] || value;
+    },
+    [languageNames],
+  );
 
-  const formatValue = (value: string, type: string, data?: Record<string, any>): string => {
-    switch (type) {
-      case 'os':
-        return formatOS(value);
-      case 'browser':
-        return formatBrowser(value);
-      case 'device':
-        return formatDevice(value);
-      case 'country':
-        return formatCountry(value);
-      case 'region':
-        return formatRegion(value);
-      case 'city':
-        return formatCity(value, data?.country);
-      case 'language':
-        return formatLanguage(value);
-      default:
-        return typeof value === 'string' ? value : undefined;
-    }
-  };
+  const formatValue = useCallback(
+    (value: string, type: string, data?: Record<string, any>): string => {
+      switch (type) {
+        case 'os':
+          return formatOS(value);
+        case 'browser':
+          return formatBrowser(value);
+        case 'device':
+          return formatDevice(value);
+        case 'country':
+          return formatCountry(value);
+        case 'region':
+          return formatRegion(value);
+        case 'city':
+          return formatCity(value, data?.country);
+        case 'language':
+          return formatLanguage(value);
+        default:
+          return typeof value === 'string' ? value : undefined;
+      }
+    },
+    [
+      formatBrowser,
+      formatCity,
+      formatCountry,
+      formatDevice,
+      formatLanguage,
+      formatOS,
+      formatRegion,
+    ],
+  );
 
-  return {
-    formatOS,
-    formatBrowser,
-    formatDevice,
-    formatCountry,
-    formatRegion,
-    formatCity,
-    formatLanguage,
-    formatValue,
-  };
+  return useMemo(
+    () => ({
+      formatOS,
+      formatBrowser,
+      formatDevice,
+      formatCountry,
+      formatRegion,
+      formatCity,
+      formatLanguage,
+      formatValue,
+    }),
+    [
+      formatBrowser,
+      formatCity,
+      formatCountry,
+      formatDevice,
+      formatLanguage,
+      formatOS,
+      formatRegion,
+      formatValue,
+    ],
+  );
 }

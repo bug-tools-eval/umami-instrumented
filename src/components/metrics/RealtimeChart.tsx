@@ -27,7 +27,7 @@ export function RealtimeChart({ data, unit, ...props }: RealtimeChartProps) {
       pageviews: formatSeriesTimezone(data.series.views, 'x', timezone),
       sessions: formatSeriesTimezone(data.series.visitors, 'x', timezone),
     };
-  }, [data, startDate, endDate, unit]);
+  }, [data, formatSeriesTimezone, timezone]);
 
   const animationDuration = useMemo(() => {
     // Don't animate the bars shifting over because it looks weird

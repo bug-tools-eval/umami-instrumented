@@ -1,5 +1,8 @@
 import { DEFAULT_CURRENCY } from './constants';
 
+const numberFormatCache = new Map<string, Intl.NumberFormat>();
+const MAX_NUMBER_FORMAT_CACHE_SIZE = 100;
+
 export function parseTime(val: number) {
   const days = ~~(val / 86400);
   const hours = ~~(val / 3600) - days * 24;
@@ -84,23 +87,34 @@ export function stringToColor(str: string) {
   return color;
 }
 
-export function formatCurrency(value: number, currency: string, locale = 'en-US') {
-  let formattedValue: Intl.NumberFormat;
+function getCurrencyFormatter(currency: string, locale = 'en-US') {
+  const key = `${locale}:${currency}`;
+  const cached = numberFormatCache.get(key);
 
-  try {
-    formattedValue = new Intl.NumberFormat(locale, {
-      style: 'currency',
-      currency: currency,
-    });
-  } catch {
-    // Fallback to default currency format if an error occurs
-    formattedValue = new Intl.NumberFormat(locale, {
-      style: 'currency',
-      currency: DEFAULT_CURRENCY,
-    });
+  if (cached) {
+    return cached;
   }
 
-  return formattedValue.format(value);
+  const formatter = new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency,
+  });
+
+  if (numberFormatCache.size >= MAX_NUMBER_FORMAT_CACHE_SIZE) {
+    numberFormatCache.delete(numberFormatCache.keys().next().value);
+  }
+
+  numberFormatCache.set(key, formatter);
+
+  return formatter;
+}
+
+export function formatCurrency(value: number, currency: string, locale = 'en-US') {
+  try {
+    return getCurrencyFormatter(currency, locale).format(value);
+  } catch {
+    return getCurrencyFormatter(DEFAULT_CURRENCY, locale).format(value);
+  }
 }
 
 export function formatLongCurrency(value: number, currency: string, locale = 'en-US') {

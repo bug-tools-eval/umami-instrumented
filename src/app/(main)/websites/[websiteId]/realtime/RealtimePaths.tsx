@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import thenby from 'thenby';
 import { useMessages, useWebsite } from '@/components/hooks';
 import { ListTable } from '@/components/metrics/ListTable';
@@ -18,16 +19,24 @@ export function RealtimePaths({ data }: { data: any }) {
     );
   };
 
-  const pages = percentFilter(
-    Object.keys(urls)
-      .map(key => {
-        return {
-          x: key,
-          y: urls[key],
-        };
-      })
-      .sort(thenby.firstBy('y', -1))
-      .slice(0, limit),
+  const pages = useMemo(
+    () =>
+      percentFilter(
+        Object.keys(urls)
+          .map(key => {
+            return {
+              x: key,
+              y: urls[key],
+            };
+          })
+          .sort(thenby.firstBy('y', -1))
+          .slice(0, limit),
+      ).map(({ x, y, z }: { x: string; y: number; z: number }) => ({
+        label: x,
+        count: y,
+        percent: z,
+      })),
+    [urls],
   );
 
   return (
@@ -35,11 +44,7 @@ export function RealtimePaths({ data }: { data: any }) {
       title={t(labels.pages)}
       metric={t(labels.views)}
       renderLabel={renderLink}
-      data={pages.map(({ x, y, z }: { x: string; y: number; z: number }) => ({
-        label: x,
-        count: y,
-        percent: z,
-      }))}
+      data={pages}
     />
   );
 }

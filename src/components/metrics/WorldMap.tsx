@@ -1,4 +1,4 @@
-import { Box, Column, type ColumnProps, FloatingTooltip, Text, useTheme } from '@umami/react-zen';
+import { Box, Column, type ColumnProps, FloatingTooltip, useTheme } from '@umami/react-zen';
 import { colord } from 'colord';
 import { useMemo, useState } from 'react';
 import { ComposableMap, Geographies, Geography, ZoomableGroup } from 'react-simple-maps';
@@ -21,7 +21,7 @@ export interface WorldMapProps extends ColumnProps {
 export function WorldMap({ websiteId, data, ...props }: WorldMapProps) {
   const [tooltip, setTooltipPopup] = useState();
   const { theme } = useTheme();
-  const { colors } = getThemeColors(theme);
+  const { colors } = useMemo(() => getThemeColors(theme), [theme]);
   const { locale } = useLocale();
   const { t, labels } = useMessages();
   const { countryNames } = useCountryNames(locale);
@@ -37,17 +37,36 @@ export function WorldMap({ websiteId, data, ...props }: WorldMapProps) {
     [data, mapData],
   );
 
+  const metricsByCountry = useMemo(
+    () => new Map(metrics.map(country => [country.x, country])),
+    [metrics],
+  );
+
+  const countryFillColors = useMemo(() => {
+    const result = new Map<string, string>();
+    const colorAdjust = theme === 'light' ? 'lighten' : 'darken';
+
+    for (const country of metrics) {
+      result.set(
+        country.x,
+        colord(colors.map.baseColor)
+          [colorAdjust](0.4 * (1.0 - country.z / 100))
+          .toHex(),
+      );
+    }
+
+    return result;
+  }, [colors.map.baseColor, metrics, theme]);
+
   const getFillColor = (code: string) => {
     if (code === 'AQ') return;
-    const country = metrics?.find(({ x }) => x === code);
+    const color = countryFillColors.get(code);
 
-    if (!country) {
+    if (!color) {
       return colors.map.fillColor;
     }
 
-    return colord(colors.map.baseColor)
-      [theme === 'light' ? 'lighten' : 'darken'](0.4 * (1.0 - country.z / 100))
-      .toHex();
+    return color;
   };
 
   const getOpacity = (code: string) => {
@@ -56,7 +75,7 @@ export function WorldMap({ websiteId, data, ...props }: WorldMapProps) {
 
   const handleHover = (code: string) => {
     if (code === 'AQ') return;
-    const country = metrics?.find(({ x }) => x === code);
+    const country = metricsByCountry.get(code);
     setTooltipPopup(
       `${countryNames[code] || unknownLabel}: ${formatLongNumber(
         country?.y || 0,
