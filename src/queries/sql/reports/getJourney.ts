@@ -116,9 +116,8 @@ async function relationalQuery(
   return rawQuery(
     `
     WITH events AS (
-      select distinct
+      select
           website_event.visit_id,
-          website_event.referrer_path,
           coalesce(nullIf(website_event.event_name, ''), website_event.url_path) "event",
           row_number() OVER (PARTITION BY visit_id ORDER BY website_event.created_at) AS event_number
       from website_event
@@ -228,7 +227,7 @@ async function clickhouseQuery(
   return rawQuery(
     `
     WITH events AS (
-      select distinct
+      select
           visit_id,
           coalesce(nullIf(event_name, ''), url_path) "event",
           row_number() OVER (PARTITION BY visit_id ORDER BY created_at) AS event_number

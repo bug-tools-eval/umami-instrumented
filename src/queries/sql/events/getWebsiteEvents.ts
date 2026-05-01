@@ -1,4 +1,5 @@
 import clickhouse from '@/lib/clickhouse';
+import { DEFAULT_PAGE_SIZE } from '@/lib/constants';
 import { CLICKHOUSE, PRISMA, runQuery } from '@/lib/db';
 import prisma from '@/lib/prisma';
 import type { QueryFilters } from '@/lib/types';
@@ -13,8 +14,12 @@ export function getWebsiteEvents(...args: [websiteId: string, filters: QueryFilt
 }
 
 async function relationalQuery(websiteId: string, filters: QueryFilters) {
-  const { pagedRawQuery, parseFilters } = prisma;
+  const { rawQuery, parseFilters } = prisma;
   const { search } = filters;
+  const { page = 1, pageSize, orderBy, sortDescending = false } = filters;
+  const size = +pageSize || DEFAULT_PAGE_SIZE;
+  const offset = +size * (+page - 1);
+  const direction = sortDescending ? 'desc' : 'asc';
   const { filterQuery, dateQuery, cohortQuery, queryParams } = parseFilters({
     ...filters,
     websiteId,
@@ -25,8 +30,14 @@ async function relationalQuery(websiteId: string, filters: QueryFilters) {
            or (url_path ilike {{search}} and event_type = 1))`
     : '';
 
-  return pagedRawQuery(
-    `
+  const statements = [
+    orderBy && `order by ${orderBy} ${direction}`,
+    +size > 0 && `limit ${+size} offset ${offset}`,
+  ]
+    .filter(n => n)
+    .join('\n');
+
+  const dataQuery = `
     select
       website_event.event_id as "id",
       website_event.website_id as "websiteId", 
@@ -52,23 +63,42 @@ async function relationalQuery(websiteId: string, filters: QueryFilters) {
                       and created_at between {{startDate}} and {{endDate}}) AS "hasData"
     from website_event
     ${cohortQuery}
-    join session on session.session_id = website_event.session_id 
+    join session on session.session_id = website_event.session_id
       and session.website_id = website_event.website_id
     where website_event.website_id = {{websiteId::uuid}}
     ${dateQuery}
     ${filterQuery}
     ${searchQuery}
     order by website_event.created_at desc
-    `,
-    queryParams,
-    filters,
-    FUNCTION_NAME,
-  );
+  `;
+
+  const countQuery = `
+    select count(*) as num
+    from website_event
+    ${cohortQuery}
+    join session on session.session_id = website_event.session_id
+      and session.website_id = website_event.website_id
+    where website_event.website_id = {{websiteId::uuid}}
+    ${dateQuery}
+    ${filterQuery}
+    ${searchQuery}
+  `;
+
+  const [count, data] = await Promise.all([
+    rawQuery(countQuery, queryParams).then(res => res[0].num),
+    rawQuery(`${dataQuery}${statements}`, queryParams, FUNCTION_NAME),
+  ]);
+
+  return { data, count, page: +page, pageSize: size, orderBy };
 }
 
 async function clickhouseQuery(websiteId: string, filters: QueryFilters) {
-  const { pagedRawQuery, parseFilters } = clickhouse;
+  const { rawQuery, parseFilters } = clickhouse;
   const { search } = filters;
+  const { page = 1, pageSize, orderBy, sortDescending = false } = filters;
+  const size = +pageSize || DEFAULT_PAGE_SIZE;
+  const offset = +size * (+page - 1);
+  const direction = sortDescending ? 'desc' : 'asc';
   const { queryParams, dateQuery, cohortQuery, filterQuery } = parseFilters({
     ...filters,
     websiteId,
@@ -79,8 +109,14 @@ async function clickhouseQuery(websiteId: string, filters: QueryFilters) {
            or (positionCaseInsensitive(url_path, {search:String}) > 0 and event_type = 1))`
     : '';
 
-  return pagedRawQuery(
-    `
+  const statements = [
+    orderBy && `order by ${orderBy} ${direction}`,
+    +size > 0 && `limit ${+size} offset ${+offset}`,
+  ]
+    .filter(n => n)
+    .join('\n');
+
+  const dataQuery = `
     select
       event_id as id,
       website_id as websiteId, 
@@ -111,9 +147,22 @@ async function clickhouseQuery(websiteId: string, filters: QueryFilters) {
     ${filterQuery}
     ${searchQuery}
     order by created_at desc
-    `,
-    queryParams,
-    filters,
-    FUNCTION_NAME,
-  );
+  `;
+
+  const countQuery = `
+    select count(*) as num
+    from website_event
+    ${cohortQuery}
+    where website_id = {websiteId:UUID}
+    ${dateQuery}
+    ${filterQuery}
+    ${searchQuery}
+  `;
+
+  const [count, data] = await Promise.all([
+    rawQuery<Array<{ num: number }>>(countQuery, queryParams).then(res => res[0].num),
+    rawQuery(`${dataQuery}${statements}`, queryParams, FUNCTION_NAME),
+  ]);
+
+  return { data, count, page: +page, pageSize: size, orderBy, search };
 }
