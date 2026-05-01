@@ -21,42 +21,38 @@ export async function getRealtimeData(websiteId: string, filters: QueryFilters) 
   ]);
 
   const uniques = new Set();
+  const countries = {};
+  const urls = {};
+  const referrers = {};
+  const events = [];
+  let eventCount = 0;
+  let countryCount = 0;
 
-  const { countries, urls, referrers, events } = activity.reverse().reduce(
-    (
-      obj: { countries: any; urls: any; referrers: any; events: any },
-      event: {
-        sessionId: string;
-        urlPath: string;
-        referrerDomain: string;
-        country: string;
-        eventName: string;
-      },
-    ) => {
-      const { countries, urls, referrers, events } = obj;
-      const { sessionId, urlPath, referrerDomain, country, eventName } = event;
+  for (let i = activity.length - 1; i >= 0; i--) {
+    const event = activity[i];
+    const { sessionId, urlPath, referrerDomain, country, eventName } = event;
 
-      if (!uniques.has(sessionId)) {
-        uniques.add(sessionId);
-        increment(countries, country);
+    if (!uniques.has(sessionId)) {
+      uniques.add(sessionId);
 
-        events.push({ __type: 'session', ...event });
+      if (country && !countries[country]) {
+        countryCount += 1;
       }
 
-      increment(urls, urlPath);
-      increment(referrers, referrerDomain);
+      increment(countries, country);
 
-      events.push({ __type: eventName ? 'event' : 'pageview', ...event });
+      events.push({ __type: 'session', ...event });
+    }
 
-      return obj;
-    },
-    {
-      countries: {},
-      urls: {},
-      referrers: {},
-      events: [],
-    },
-  );
+    increment(urls, urlPath);
+    increment(referrers, referrerDomain);
+
+    if (eventName) {
+      eventCount += 1;
+    }
+
+    events.push({ __type: eventName ? 'event' : 'pageview', ...event });
+  }
 
   return {
     countries,
@@ -68,11 +64,21 @@ export async function getRealtimeData(websiteId: string, filters: QueryFilters) 
       visitors: sessions,
     },
     totals: {
-      views: pageviews.reduce((sum: number, { y }: { y: number }) => Number(sum) + Number(y), 0),
-      visitors: sessions.reduce((sum: number, { y }: { y: number }) => Number(sum) + Number(y), 0),
-      events: activity.filter(e => e.eventName).length,
-      countries: Object.keys(countries).length,
+      views: sumY(pageviews),
+      visitors: sumY(sessions),
+      events: eventCount,
+      countries: countryCount,
     },
     timestamp: Date.now(),
   };
+}
+
+function sumY(data: { y: number }[]) {
+  let sum = 0;
+
+  for (const { y } of data) {
+    sum += Number(y);
+  }
+
+  return sum;
 }

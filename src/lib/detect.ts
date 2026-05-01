@@ -94,7 +94,7 @@ function getBlockedIpList(ignoreIps: string) {
 export function hasBlockedIp(clientIp: string) {
   const ignoreIps = process.env.IGNORE_IP;
 
-  if (ignoreIps) {
+  if (ignoreIps && clientIp) {
     const { exact, cidr } = getBlockedIpList(ignoreIps);
 
     if (exact.has(clientIp)) {
@@ -176,16 +176,28 @@ export async function getLocation(ip: string = '', headers: Headers, skipHeaders
   }
 }
 
-export async function getClientInfo(request: Request, payload: Record<string, any>) {
+export async function getClientInfo(
+  request: Request,
+  payload: Record<string, any>,
+  options: { skipLocation?: boolean; skipUserAgentParsing?: boolean } = {},
+) {
   const userAgent = payload?.userAgent || request.headers.get('user-agent');
   const ip = payload?.ip || getIpAddress(request.headers);
-  const location = await getLocation(ip, request.headers, !!payload?.ip);
+  const location = options.skipLocation
+    ? null
+    : await getLocation(ip, request.headers, !!payload?.ip);
   const country = safeDecodeURIComponent(location?.country);
   const region = safeDecodeURIComponent(location?.region);
   const city = safeDecodeURIComponent(location?.city);
-  const browser = payload?.browser ?? browserName(userAgent);
-  const os = payload?.os ?? (detectOS(userAgent) as string);
-  const device = payload?.device ?? getDevice(userAgent, payload?.screen);
+  const browser = options.skipUserAgentParsing
+    ? payload?.browser
+    : (payload?.browser ?? browserName(userAgent));
+  const os = options.skipUserAgentParsing
+    ? payload?.os
+    : (payload?.os ?? (detectOS(userAgent) as string));
+  const device = options.skipUserAgentParsing
+    ? payload?.device
+    : (payload?.device ?? getDevice(userAgent, payload?.screen));
 
   return { userAgent, browser, os, ip, country, region, city, device };
 }

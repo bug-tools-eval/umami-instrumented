@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { FILTER_COLUMNS, OPERATORS } from '@/lib/constants';
 import { safeDecodeURIComponent } from '@/lib/url';
 import { useFields } from './useFields';
@@ -56,12 +57,19 @@ export function useFilters() {
     uuid: [OPERATORS.equals],
   };
 
-  const filters = Object.keys(query).reduce((arr, key) => {
-    const baseName = key.replace(/\d+$/, '');
-    if (FILTER_COLUMNS[baseName]) {
+  const filters = useMemo(() => {
+    const fieldLabels = new Map(fields.map(({ name, label }) => [name, label]));
+    const arr = [];
+
+    for (const key of Object.keys(query)) {
+      const baseName = key.replace(/\d+$/, '');
+      if (!FILTER_COLUMNS[baseName]) {
+        continue;
+      }
+
       let operator = 'eq';
       let value = safeDecodeURIComponent(query[key]);
-      const label = fields.find(({ name }) => name === baseName)?.label;
+      const label = fieldLabels.get(baseName);
 
       const match = value.match(/^([a-z]+)\.(.*)/);
 
@@ -70,7 +78,7 @@ export function useFilters() {
         value = match[2];
       }
 
-      return arr.concat({
+      arr.push({
         name: key,
         type: baseName,
         operator,
@@ -78,8 +86,9 @@ export function useFilters() {
         label,
       });
     }
+
     return arr;
-  }, []);
+  }, [fields, query]);
 
   const getFilters = (type: string) => {
     return (

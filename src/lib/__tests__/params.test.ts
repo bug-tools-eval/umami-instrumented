@@ -2,6 +2,7 @@ import { OPERATORS } from '../constants';
 import {
   filtersArrayToObject,
   filtersObjectToArray,
+  hasEventFilter,
   isEqualsOperator,
   isSearchOperator,
   parseFilterValue,
@@ -23,6 +24,11 @@ test('operator helpers identify equals and search operators', () => {
   expect(isEqualsOperator(OPERATORS.contains)).toBe(false);
   expect(isSearchOperator(OPERATORS.regex)).toBe(true);
   expect(isSearchOperator(OPERATORS.notEquals)).toBe(false);
+});
+
+test('hasEventFilter detects event filter keys', () => {
+  expect(hasEventFilter({ path: '/docs' })).toBe(true);
+  expect(hasEventFilter({ browser: 'Chrome' })).toBe(false);
 });
 
 test('filtersObjectToArray preserves filter metadata', () => {

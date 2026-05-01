@@ -77,7 +77,14 @@ export async function POST(request: Request) {
     }
 
     // Client info for bot/IP checks
-    const { ip, userAgent } = await getClientInfo(request, {});
+    const { ip, userAgent } = await getClientInfo(
+      request,
+      {},
+      {
+        skipLocation: true,
+        skipUserAgentParsing: true,
+      },
+    );
 
     if (!process.env.DISABLE_BOT_CHECK && isbot(userAgent)) {
       return json({ beep: 'boop' });

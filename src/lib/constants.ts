@@ -64,6 +64,9 @@ export const SESSION_COLUMNS = [
   'distinctId',
 ];
 
+export const EVENT_COLUMN_SET = new Set(EVENT_COLUMNS);
+export const SESSION_COLUMN_SET = new Set(SESSION_COLUMNS);
+
 export const SEGMENT_TYPES = {
   segment: 'segment',
   cohort: 'cohort',

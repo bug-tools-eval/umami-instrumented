@@ -1,4 +1,4 @@
-import { FILTER_COLUMNS, OPERATORS } from '@/lib/constants';
+import { EVENT_COLUMN_SET, FILTER_COLUMNS, OPERATORS } from '@/lib/constants';
 import type { Filter, Operator, QueryFilters, QueryOptions } from '@/lib/types';
 
 const OPERATOR_VALUES = Object.values(OPERATORS).join('|');
@@ -38,6 +38,20 @@ export function isEqualsOperator(operator: any) {
 
 export function isSearchOperator(operator: any) {
   return SEARCH_OPERATORS.has(operator);
+}
+
+export function hasEventFilter(filters: QueryFilters) {
+  if (!filters) {
+    return false;
+  }
+
+  for (const key of Object.keys(filters)) {
+    if (EVENT_COLUMN_SET.has(key)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 export function filtersObjectToArray(filters: QueryFilters, options: QueryOptions = {}): Filter[] {

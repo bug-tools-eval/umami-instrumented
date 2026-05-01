@@ -2,7 +2,13 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { readReplicas } from '@prisma/extension-read-replicas';
 import debug from 'debug';
 import { PrismaClient } from '@/generated/prisma/client';
-import { DEFAULT_PAGE_SIZE, FILTER_COLUMNS, OPERATORS, SESSION_COLUMNS } from './constants';
+import {
+  DEFAULT_PAGE_SIZE,
+  FILTER_COLUMNS,
+  OPERATORS,
+  SESSION_COLUMN_SET,
+  SESSION_COLUMNS,
+} from './constants';
 import { filtersObjectToArray } from './params';
 import type { Operator, QueryFilters, QueryOptions } from './types';
 
@@ -35,7 +41,6 @@ const DATE_FORMATS_UTC = {
   year: 'YYYY-01-01"T"HH24:00:00"Z"',
 };
 
-const SESSION_COLUMN_SET = new Set(SESSION_COLUMNS);
 const JOIN_SESSION_FILTERS = new Set(['referrer', ...SESSION_COLUMNS]);
 const EQUALS_OPERATORS = new Set<Operator>([OPERATORS.equals, OPERATORS.notEquals]);
 const SEARCH_OPERATORS = new Set<Operator>([OPERATORS.contains, OPERATORS.doesNotContain]);

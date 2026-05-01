@@ -1,5 +1,5 @@
 import clickhouse from '@/lib/clickhouse';
-import { EVENT_TYPE, FILTER_COLUMNS, SESSION_COLUMNS } from '@/lib/constants';
+import { EVENT_TYPE, FILTER_COLUMNS, SESSION_COLUMN_SET } from '@/lib/constants';
 import { CLICKHOUSE, PRISMA, runQuery } from '@/lib/db';
 import prisma from '@/lib/prisma';
 import type { QueryFilters } from '@/lib/types';
@@ -44,7 +44,7 @@ async function relationalQuery(
       websiteId,
       eventType: EVENT_TYPE.customEvent,
     },
-    { joinSession: SESSION_COLUMNS.includes(type) },
+    { joinSession: SESSION_COLUMN_SET.has(type) },
   );
 
   return rawQuery(

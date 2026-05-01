@@ -31,17 +31,20 @@ export function useWebsiteValuesQuery({
       const values = names[type];
 
       if (values) {
-        return (
-          Object.keys(values)
-            .reduce((arr: string[], key: string) => {
-              if (values[key].toLowerCase().includes(value.toLowerCase())) {
-                return arr.concat(key);
-              }
-              return arr;
-            }, [])
-            .slice(0, 5)
-            .join(',') || value
-        );
+        const matches: string[] = [];
+        const search = value.toLowerCase();
+
+        for (const key of Object.keys(values)) {
+          if (values[key].toLowerCase().includes(search)) {
+            matches.push(key);
+
+            if (matches.length >= 5) {
+              break;
+            }
+          }
+        }
+
+        return matches.join(',') || value;
       }
 
       return value;
