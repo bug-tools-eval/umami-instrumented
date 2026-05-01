@@ -20,8 +20,10 @@ export async function POST(request: Request) {
     return unauthorized();
   }
 
-  const parameters = await setWebsiteDate(websiteId, body.parameters);
-  const filters = await getQueryFilters(body.filters, websiteId);
+  const [parameters, filters] = await Promise.all([
+    setWebsiteDate(websiteId, body.parameters),
+    getQueryFilters(body.filters, websiteId),
+  ]);
 
   const [{ chart }, total, metrics] = await Promise.all([
     getRevenue(websiteId, parameters as RevenuParameters, filters),

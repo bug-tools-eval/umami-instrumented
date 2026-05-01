@@ -78,8 +78,13 @@ export async function hasPermission(role: string, permission: string | string[])
 }
 
 export function parseShareToken(request: Request) {
+  // Skip the jsonwebtoken machinery when no share header is present
+  // (the common case for every authenticated dashboard request).
+  const token = request.headers.get(SHARE_TOKEN_HEADER);
+  if (!token) return null;
+
   try {
-    return parseToken(request.headers.get(SHARE_TOKEN_HEADER), secret());
+    return parseToken(token, secret());
   } catch (e) {
     log(e);
     return null;

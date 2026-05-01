@@ -18,20 +18,18 @@ export async function POST(request: Request) {
     return unauthorized();
   }
 
-  const filters = await getQueryFilters(body.filters, websiteId);
-  const parameters = await setWebsiteDate(websiteId, body.parameters);
+  const [filters, parameters] = await Promise.all([
+    getQueryFilters(body.filters, websiteId),
+    setWebsiteDate(websiteId, body.parameters),
+  ]);
 
-  const data = {
-    utm_source: [],
-    utm_medium: [],
-    utm_campaign: [],
-    utm_term: [],
-    utm_content: [],
-  };
+  const results = await Promise.all(
+    UTM_PARAMS.map(key =>
+      getUTM(websiteId, { column: key, ...parameters } as UTMParameters, filters),
+    ),
+  );
 
-  for (const key of UTM_PARAMS) {
-    data[key] = await getUTM(websiteId, { column: key, ...parameters } as UTMParameters, filters);
-  }
+  const data = Object.fromEntries(UTM_PARAMS.map((key, i) => [key, results[i]]));
 
   return json(data);
 }
