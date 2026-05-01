@@ -63,11 +63,11 @@ export async function saveAuth(data: any, expire = 0) {
   const authKey = `auth:${createAuthKey()}`;
 
   if (redis.enabled) {
-    await redis.client.set(authKey, data);
-
-    if (expire) {
-      await redis.client.expire(authKey, expire);
-    }
+    // Pass the TTL on the SET command (Redis SET ... EX ...) instead of
+    // following up with a separate EXPIRE round trip. UmamiRedisClient.set
+    // already applies DEFAULT_TTL when no time is supplied, so passing 0
+    // preserves the previous fall-through behavior.
+    await redis.client.set(authKey, data, expire);
   }
 
   return createSecureToken({ authKey }, secret());

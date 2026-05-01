@@ -104,13 +104,18 @@ async function relationalQuery({
 }: SaveEventArgs) {
   const websiteEventId = uuid();
 
+  // Truncate once and reuse — these were previously substring'd up to three
+  // times per event (websiteEvent, saveEventData, saveRevenue).
+  const truncatedUrlPath = urlPath?.substring(0, URL_LENGTH);
+  const truncatedEventName = eventName?.substring(0, EVENT_NAME_LENGTH);
+
   await prisma.client.websiteEvent.create({
     data: {
       id: websiteEventId,
       websiteId,
       sessionId,
       visitId,
-      urlPath: urlPath?.substring(0, URL_LENGTH),
+      urlPath: truncatedUrlPath,
       urlQuery: urlQuery?.substring(0, URL_LENGTH),
       utmSource,
       utmMedium,
@@ -128,7 +133,7 @@ async function relationalQuery({
       lifatid,
       twclid,
       eventType,
-      eventName: eventName ? eventName?.substring(0, EVENT_NAME_LENGTH) : null,
+      eventName: eventName ? truncatedEventName : null,
       tag,
       hostname,
       lcp,
@@ -141,29 +146,32 @@ async function relationalQuery({
   });
 
   if (eventData) {
-    await saveEventData({
-      websiteId,
-      sessionId,
-      eventId: websiteEventId,
-      urlPath: urlPath?.substring(0, URL_LENGTH),
-      eventName: eventName?.substring(0, EVENT_NAME_LENGTH),
-      eventData,
-      createdAt,
-    });
-
     const { revenue, currency } = eventData;
 
-    if (revenue > 0 && currency) {
-      await saveRevenue({
+    // saveEventData and saveRevenue both reference the just-created event but
+    // are independent of each other, so issue them concurrently.
+    await Promise.all([
+      saveEventData({
         websiteId,
         sessionId,
         eventId: websiteEventId,
-        eventName: eventName?.substring(0, EVENT_NAME_LENGTH),
-        currency,
-        revenue,
+        urlPath: truncatedUrlPath,
+        eventName: truncatedEventName,
+        eventData,
         createdAt,
-      });
-    }
+      }),
+      revenue > 0 && currency
+        ? saveRevenue({
+            websiteId,
+            sessionId,
+            eventId: websiteEventId,
+            eventName: truncatedEventName,
+            currency,
+            revenue,
+            createdAt,
+          })
+        : Promise.resolve(),
+    ]);
   }
 }
 
