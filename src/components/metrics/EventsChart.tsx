@@ -1,5 +1,5 @@
 import { colord } from 'colord';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import { BarChart, type BarChartProps } from '@/components/charts/BarChart';
 import { LoadingPanel } from '@/components/common/LoadingPanel';
 import {
@@ -25,7 +25,6 @@ export function EventsChart({ websiteId, focusLabel, limit }: EventsChartProps) 
   } = useDateRange({ timezone: timezone });
   const { locale, dateLocale } = useLocale();
   const { data, isLoading, error } = useWebsiteEventsSeriesQuery(websiteId, { limit });
-  const [label, setLabel] = useState<string>(focusLabel);
 
   const chartData: any = useMemo(() => {
     if (!data) return;
@@ -66,13 +65,7 @@ export function EventsChart({ websiteId, focusLabel, limit }: EventsChartProps) 
         focusLabel,
       };
     }
-  }, [data, startDate, endDate, unit, focusLabel]);
-
-  useEffect(() => {
-    if (label !== focusLabel) {
-      setLabel(focusLabel);
-    }
-  }, [focusLabel]);
+  }, [data, startDate, endDate, unit, dateLocale, focusLabel]);
 
   const renderXLabel = useCallback(renderDateLabels(unit, locale), [unit, locale]);
 

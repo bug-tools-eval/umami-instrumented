@@ -1,5 +1,6 @@
 import { Focusable, Grid, Row, Text, Tooltip, TooltipTrigger } from '@umami/react-zen';
 import { addHours, format, startOfDay } from 'date-fns';
+import { useMemo } from 'react';
 import { LoadingPanel } from '@/components/common/LoadingPanel';
 import { useLocale, useMessages, useWeeklyTrafficQuery } from '@/components/hooks';
 import { getDayOfWeekAsDate } from '@/lib/date';
@@ -9,30 +10,42 @@ export function WeeklyTraffic({ websiteId }: { websiteId: string }) {
   const { dateLocale } = useLocale();
   const { labels, t } = useMessages();
   const { weekStartsOn } = dateLocale.options;
-  const daysOfWeek = Array(7)
-    .fill(weekStartsOn)
-    .map((d, i) => (d + i) % 7);
+  const daysOfWeek = useMemo(
+    () =>
+      Array(7)
+        .fill(weekStartsOn)
+        .map((d, i) => (d + i) % 7),
+    [weekStartsOn],
+  );
+  const hourLabels = useMemo(() => {
+    const dayStart = startOfDay(new Date());
 
-  const [, max = 1] = data
-    ? data.reduce((arr: number[], hours: number[], index: number) => {
-        const min = Math.min(...hours);
-        const max = Math.max(...hours);
+    return Array(24)
+      .fill(null)
+      .map((_, i) =>
+        format(addHours(dayStart, i), 'haaa', {
+          locale: dateLocale,
+        }),
+      );
+  }, [dateLocale]);
 
-        if (index === 0) {
-          return [min, max];
+  const max = useMemo(() => {
+    if (!data) {
+      return 1;
+    }
+
+    let max = 0;
+
+    for (const hours of data) {
+      for (const count of hours) {
+        if (count > max) {
+          max = count;
         }
+      }
+    }
 
-        if (min < arr[0]) {
-          arr[0] = min;
-        }
-
-        if (max > arr[1]) {
-          arr[1] = max;
-        }
-
-        return arr;
-      }, [])
-    : [];
+    return max || 1;
+  }, [data]);
 
   return (
     <LoadingPanel data={data} isLoading={isLoading} error={error}>
@@ -48,20 +61,13 @@ export function WeeklyTraffic({ websiteId }: { websiteId: string }) {
               </Row>
             ))}
             <Grid rows="repeat(24, 16px)" gap="1">
-              {Array(24)
-                .fill(null)
-                .map((_, i) => {
-                  const label = format(addHours(startOfDay(new Date()), i), 'haaa', {
-                    locale: dateLocale,
-                  });
-                  return (
-                    <Row key={i} justifyContent="flex-end">
-                      <Text color="muted" size="sm">
-                        {label}
-                      </Text>
-                    </Row>
-                  );
-                })}
+              {hourLabels.map((label, i) => (
+                <Row key={i} justifyContent="flex-end">
+                  <Text color="muted" size="sm">
+                    {label}
+                  </Text>
+                </Row>
+              ))}
             </Grid>
             {daysOfWeek.map((index: number) => {
               const day = data[index];

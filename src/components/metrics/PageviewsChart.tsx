@@ -80,7 +80,7 @@ export function PageviewsChart({ data, unit, minDate, maxDate, ...props }: Pagev
           : []),
       ],
     };
-  }, [data, locale]);
+  }, [colors, data, dateLocale, labels, maxDate, minDate, t, unit]);
 
   const renderXLabel = useCallback(renderDateLabels(unit, locale), [unit, locale]);
 

@@ -88,19 +88,35 @@ export async function POST(request: Request) {
     }
 
     // Compute timestamps from events
-    const eventTimestamps = events
-      .map((e: any) => Number(e?.timestamp))
-      .filter((t: number) => Number.isFinite(t) && t > 0);
+    const now = Math.floor(Date.now() / 1000);
+    const fallbackMs = (timestamp || now) * 1000;
+    let minTimestamp = Number.POSITIVE_INFINITY;
+    let maxTimestamp = 0;
 
-    const fallbackMs = (timestamp || Math.floor(Date.now() / 1000)) * 1000;
-    const minTimestamp = eventTimestamps.length ? Math.min(...eventTimestamps) : fallbackMs;
-    const maxTimestamp = eventTimestamps.length ? Math.max(...eventTimestamps) : fallbackMs;
+    for (const event of events) {
+      const eventTimestamp = Number(event?.timestamp);
+
+      if (Number.isFinite(eventTimestamp) && eventTimestamp > 0) {
+        if (eventTimestamp < minTimestamp) {
+          minTimestamp = eventTimestamp;
+        }
+
+        if (eventTimestamp > maxTimestamp) {
+          maxTimestamp = eventTimestamp;
+        }
+      }
+    }
+
+    if (minTimestamp === Number.POSITIVE_INFINITY) {
+      minTimestamp = fallbackMs;
+      maxTimestamp = fallbackMs;
+    }
 
     const startedAt = new Date(minTimestamp);
     const endedAt = new Date(maxTimestamp);
 
     // Use timestamp-based chunk index for ordering
-    const chunkIndex = timestamp || Math.floor(Date.now() / 1000);
+    const chunkIndex = timestamp || now;
 
     await saveRecording({
       websiteId,

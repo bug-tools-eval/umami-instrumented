@@ -8,6 +8,11 @@ import { getIpAddress, stripPort } from '@/lib/ip';
 import { safeDecodeURIComponent } from '@/lib/url';
 
 const MAXMIND = 'maxmind';
+let blockedIpCacheKey: string;
+let blockedIpCache: {
+  exact: Set<string>;
+  cidr: ReturnType<typeof ipaddr.parseCIDR>[];
+};
 
 const PROVIDER_HEADERS = [
   // Umami custom headers (cloud mode only)
@@ -49,15 +54,63 @@ const PROVIDER_HEADERS = [
 export function getDevice(userAgent: string, screen: string = '') {
   const { device } = UAParser(userAgent);
 
-  const [width] = screen.split('x');
-
   const type = device?.type || 'desktop';
 
-  if (type === 'desktop' && screen && +width <= 1920) {
-    return 'laptop';
+  if (type === 'desktop' && screen) {
+    const [width] = screen.split('x');
+
+    if (+width <= 1920) {
+      return 'laptop';
+    }
   }
 
   return type;
+}
+
+function getBlockedIpList(ignoreIps: string) {
+  if (blockedIpCacheKey === ignoreIps) {
+    return blockedIpCache;
+  }
+
+  const exact = new Set<string>();
+  const cidr: ReturnType<typeof ipaddr.parseCIDR>[] = [];
+
+  for (const ip of ignoreIps.split(',')) {
+    const value = ip.trim();
+
+    if (value.indexOf('/') > 0) {
+      cidr.push(ipaddr.parseCIDR(value));
+    } else if (value) {
+      exact.add(value);
+    }
+  }
+
+  blockedIpCacheKey = ignoreIps;
+  blockedIpCache = { exact, cidr };
+
+  return blockedIpCache;
+}
+
+export function hasBlockedIp(clientIp: string) {
+  const ignoreIps = process.env.IGNORE_IP;
+
+  if (ignoreIps) {
+    const { exact, cidr } = getBlockedIpList(ignoreIps);
+
+    if (exact.has(clientIp)) {
+      return true;
+    }
+
+    if (cidr.length > 0) {
+      const addr = ipaddr.parse(clientIp);
+
+      return cidr.some(range => addr.kind() === range[0].kind() && addr.match(range));
+    }
+
+    return false;
+  }
+
+  return false;
 }
 
 function getRegionCode(country: string, region: string) {
@@ -135,36 +188,4 @@ export async function getClientInfo(request: Request, payload: Record<string, an
   const device = payload?.device ?? getDevice(userAgent, payload?.screen);
 
   return { userAgent, browser, os, ip, country, region, city, device };
-}
-
-export function hasBlockedIp(clientIp: string) {
-  const ignoreIps = process.env.IGNORE_IP;
-
-  if (ignoreIps) {
-    const ips = [];
-
-    if (ignoreIps) {
-      ips.push(...ignoreIps.split(',').map(n => n.trim()));
-    }
-
-    return ips.find(ip => {
-      if (ip === clientIp) {
-        return true;
-      }
-
-      // CIDR notation
-      if (ip.indexOf('/') > 0) {
-        const addr = ipaddr.parse(clientIp);
-        const range = ipaddr.parseCIDR(ip);
-
-        if (addr.kind() === range[0].kind() && addr.match(range)) {
-          return true;
-        }
-      }
-
-      return false;
-    });
-  }
-
-  return false;
 }
