@@ -21,6 +21,13 @@ export async function POST(request: Request) {
   const filters = await getQueryFilters(body.filters, websiteId);
   const parameters = await setWebsiteDate(websiteId, body.parameters);
 
+  // Run the per-column UTM lookups concurrently rather than sequentially.
+  const results = await Promise.all(
+    UTM_PARAMS.map(key =>
+      getUTM(websiteId, { column: key, ...parameters } as UTMParameters, filters),
+    ),
+  );
+
   const data = {
     utm_source: [],
     utm_medium: [],
@@ -29,9 +36,9 @@ export async function POST(request: Request) {
     utm_content: [],
   };
 
-  for (const key of UTM_PARAMS) {
-    data[key] = await getUTM(websiteId, { column: key, ...parameters } as UTMParameters, filters);
-  }
+  UTM_PARAMS.forEach((key, i) => {
+    data[key] = results[i];
+  });
 
   return json(data);
 }
