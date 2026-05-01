@@ -18,8 +18,10 @@ export async function POST(request: Request) {
     return unauthorized();
   }
 
-  const parameters = await setWebsiteDate(websiteId, body.parameters);
-  const filters = await getQueryFilters(body.filters, websiteId);
+  const [parameters, filters] = await Promise.all([
+    setWebsiteDate(websiteId, body.parameters),
+    getQueryFilters(body.filters, websiteId),
+  ]);
 
   const [{ chart, summary }, pages, pageTitles, devices, browsers] = await Promise.all([
     getPerformance(websiteId, parameters as PerformanceParameters, filters),
