@@ -101,8 +101,20 @@ async function relationalQuery(
     group by e.session_id)`;
   }
 
-  const referrerRes = await rawQuery(
-    `
+  // All eight queries are independent — fan them out concurrently instead of
+  // awaiting them one at a time.
+  const [
+    referrerRes,
+    paidAdsres,
+    sourceRes,
+    mediumRes,
+    campaignRes,
+    contentRes,
+    termRes,
+    totalRes,
+  ] = await Promise.all([
+    rawQuery(
+      `
     ${eventQuery}
     ${getModelQuery(model)}
     select coalesce(we.referrer_domain, '') as "name",
@@ -121,11 +133,10 @@ async function relationalQuery(
     order by 2 desc
     limit 20
     `,
-    queryParams,
-  );
-
-  const paidAdsres = await rawQuery(
-    `
+      queryParams,
+    ),
+    rawQuery(
+      `
     ${eventQuery}
     ${getModelQuery(model)},
 
@@ -153,56 +164,50 @@ async function relationalQuery(
     FROM results
     WHERE name != ''
     `,
-    queryParams,
-  );
-
-  const sourceRes = await rawQuery(
-    `
+      queryParams,
+    ),
+    rawQuery(
+      `
     ${eventQuery}
     ${getModelQuery(model)}
     ${getUTMQuery('utm_source')}
     `,
-    queryParams,
-  );
-
-  const mediumRes = await rawQuery(
-    `
+      queryParams,
+    ),
+    rawQuery(
+      `
     ${eventQuery}
     ${getModelQuery(model)}
     ${getUTMQuery('utm_medium')}
     `,
-    queryParams,
-  );
-
-  const campaignRes = await rawQuery(
-    `
+      queryParams,
+    ),
+    rawQuery(
+      `
     ${eventQuery}
     ${getModelQuery(model)}
     ${getUTMQuery('utm_campaign')}
     `,
-    queryParams,
-  );
-
-  const contentRes = await rawQuery(
-    `
+      queryParams,
+    ),
+    rawQuery(
+      `
     ${eventQuery}
     ${getModelQuery(model)}
     ${getUTMQuery('utm_content')}
     `,
-    queryParams,
-  );
-
-  const termRes = await rawQuery(
-    `
+      queryParams,
+    ),
+    rawQuery(
+      `
     ${eventQuery}
     ${getModelQuery(model)}
     ${getUTMQuery('utm_term')}
     `,
-    queryParams,
-  );
-
-  const totalRes = await rawQuery(
-    `
+      queryParams,
+    ),
+    rawQuery(
+      `
     select
         count(*) as "pageviews",
         count(distinct website_event.session_id) as "visitors",
@@ -215,8 +220,9 @@ async function relationalQuery(
         and website_event.${column} = {{step}}
         ${filterQuery}
     `,
-    queryParams,
-  ).then(result => result?.[0]);
+      queryParams,
+    ).then(result => result?.[0]),
+  ]);
 
   return {
     referrer: referrerRes,
@@ -312,13 +318,21 @@ async function clickhouseQuery(
           ${filterQuery}
         group by 1),`;
 
-  const referrerRes = await rawQuery<
-    {
-      name: string;
-      value: number;
-    }[]
-  >(
-    `
+  type NameValue = { name: string; value: number }[];
+
+  // All eight queries are independent — run them in parallel.
+  const [
+    referrerRes,
+    paidAdsres,
+    sourceRes,
+    mediumRes,
+    campaignRes,
+    contentRes,
+    termRes,
+    totalRes,
+  ] = await Promise.all([
+    rawQuery<NameValue>(
+      `
     ${eventQuery}
     ${getModelQuery(model)}
     select we.referrer_domain name,
@@ -338,16 +352,10 @@ async function clickhouseQuery(
     order by 2 desc
     limit 20
     `,
-    queryParams,
-  );
-
-  const paidAdsres = await rawQuery<
-    {
-      name: string;
-      value: number;
-    }[]
-  >(
-    `
+      queryParams,
+    ),
+    rawQuery<NameValue>(
+      `
     ${eventQuery}
     ${getModelQuery(model)}
     select multiIf(gclid != '', 'Google Ads',
@@ -371,82 +379,51 @@ async function clickhouseQuery(
     order by 2 desc
     limit 20
     `,
-    queryParams,
-  );
-
-  const sourceRes = await rawQuery<
-    {
-      name: string;
-      value: number;
-    }[]
-  >(
-    `
+      queryParams,
+    ),
+    rawQuery<NameValue>(
+      `
     ${eventQuery}
     ${getModelQuery(model)}
     ${getUTMQuery('utm_source')}
     `,
-    queryParams,
-  );
-
-  const mediumRes = await rawQuery<
-    {
-      name: string;
-      value: number;
-    }[]
-  >(
-    `
+      queryParams,
+    ),
+    rawQuery<NameValue>(
+      `
     ${eventQuery}
     ${getModelQuery(model)}
     ${getUTMQuery('utm_medium')}
     `,
-    queryParams,
-  );
-
-  const campaignRes = await rawQuery<
-    {
-      name: string;
-      value: number;
-    }[]
-  >(
-    `
+      queryParams,
+    ),
+    rawQuery<NameValue>(
+      `
     ${eventQuery}
     ${getModelQuery(model)}
     ${getUTMQuery('utm_campaign')}
     `,
-    queryParams,
-  );
-
-  const contentRes = await rawQuery<
-    {
-      name: string;
-      value: number;
-    }[]
-  >(
-    `
+      queryParams,
+    ),
+    rawQuery<NameValue>(
+      `
     ${eventQuery}
     ${getModelQuery(model)}
     ${getUTMQuery('utm_content')}
     `,
-    queryParams,
-  );
-
-  const termRes = await rawQuery<
-    {
-      name: string;
-      value: number;
-    }[]
-  >(
-    `
+      queryParams,
+    ),
+    rawQuery<NameValue>(
+      `
     ${eventQuery}
     ${getModelQuery(model)}
     ${getUTMQuery('utm_term')}
     `,
-    queryParams,
-  );
-
-  const totalRes = await rawQuery<{ pageviews: number; visitors: number; visits: number }>(
-    `
-    select 
+      queryParams,
+    ),
+    rawQuery<{ pageviews: number; visitors: number; visits: number }>(
+      `
+    select
         count(*) as "pageviews",
         uniqExact(session_id) as "visitors",
         uniqExact(visit_id) as "visits"
@@ -457,8 +434,9 @@ async function clickhouseQuery(
         and ${column} = {step:String}
         ${filterQuery}
     `,
-    queryParams,
-  ).then(result => result?.[0]);
+      queryParams,
+    ).then(result => result?.[0]),
+  ]);
 
   return {
     referrer: referrerRes,

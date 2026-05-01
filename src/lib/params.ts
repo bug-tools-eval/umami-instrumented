@@ -1,13 +1,14 @@
 import { FILTER_COLUMNS, OPERATORS } from '@/lib/constants';
 import type { Filter, QueryFilters, QueryOptions } from '@/lib/types';
 
+// Compile the operator regex once — OPERATORS is a constant, so this never
+// changes between calls. parseFilterValue runs for every filter on every
+// query and previously rebuilt this RegExp each time.
+const FILTER_VALUE_REGEX = new RegExp(`^(${Object.values(OPERATORS).join('|')})\\.(.*)$`);
+
 export function parseFilterValue(param: any) {
   if (typeof param === 'string') {
-    const operatorValues = Object.values(OPERATORS).join('|');
-
-    const regex = new RegExp(`^(${operatorValues})\\.(.*)$`);
-
-    const [, operator, value] = param.match(regex) || [];
+    const [, operator, value] = param.match(FILTER_VALUE_REGEX) || [];
 
     const resolvedOperator = operator || OPERATORS.equals;
     const resolvedValue = value ?? param;

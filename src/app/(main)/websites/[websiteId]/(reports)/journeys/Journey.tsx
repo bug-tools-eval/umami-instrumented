@@ -56,15 +56,41 @@ export function Journey({ websiteId, steps, startStep, endStep, view }: JourneyP
     for (let columnIndex = 0; columnIndex < +steps; columnIndex++) {
       const nodes = {};
 
+      // Group rows by name at this column once instead of running data.filter
+      // inside the loop for every unique name (was O(n²) per column).
+      const pathsByName = new Map<string, any[]>();
+      for (const row of data) {
+        const rowName = row.items[columnIndex];
+        if (rowName) {
+          const group = pathsByName.get(rowName);
+          if (group) {
+            group.push(row);
+          } else {
+            pathsByName.set(rowName, [row]);
+          }
+        }
+      }
+
+      // Pre-compute the set of names that appear in selected/active paths at
+      // this column so we avoid scanning the path arrays per row.
+      const selectedNames = new Set<string>();
+      for (const { items } of selectedPaths) {
+        if (items[columnIndex]) selectedNames.add(items[columnIndex]);
+      }
+      const activeNames = new Set<string>();
+      for (const { items } of activePaths) {
+        if (items[columnIndex]) activeNames.add(items[columnIndex]);
+      }
+
       data.forEach(({ items, count }: any, nodeIndex: any) => {
         const name = items[columnIndex];
 
         if (name) {
-          const selected = !!selectedPaths.find(({ items }) => items[columnIndex] === name);
-          const active = selected && !!activePaths.find(({ items }) => items[columnIndex] === name);
+          const selected = selectedNames.has(name);
+          const active = selected && activeNames.has(name);
 
           if (!nodes[name]) {
-            const paths = data.filter(({ items }) => items[columnIndex] === name);
+            const paths = pathsByName.get(name) ?? [];
 
             nodes[name] = {
               name,

@@ -14,36 +14,42 @@ export async function POST(request: Request) {
       return error();
     }
 
+    // Fan out the per-item sends in parallel rather than awaiting them one by
+    // one. Each iteration builds an independent Request and calls send.POST,
+    // so they don't need to be serialized.
+    const settled = await Promise.all(
+      body.map(async data => {
+        // Recreate a fresh Request since `new Request(request)` will have the following error:
+        // > Cannot read private member #state from an object whose class did not declare it
+
+        // Copy headers we received, ensure JSON content type, and avoid conflicting content-length
+        const headers = new Headers(request.headers);
+        headers.set('content-type', 'application/json');
+        headers.delete('content-length');
+
+        const newRequest = new Request(request.url, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(data),
+        });
+
+        const response = await send.POST(newRequest);
+        const responseJson = await response.json();
+
+        return { ok: response.ok, responseJson };
+      }),
+    );
+
     const errors = [];
-
-    let index = 0;
     let cache = null;
-    for (const data of body) {
-      // Recreate a fresh Request since `new Request(request)` will have the following error:
-      // > Cannot read private member #state from an object whose class did not declare it
 
-      // Copy headers we received, ensure JSON content type, and avoid conflicting content-length
-      const headers = new Headers(request.headers);
-      headers.set('content-type', 'application/json');
-      headers.delete('content-length');
-
-      const newRequest = new Request(request.url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(data),
-      });
-
-      const response = await send.POST(newRequest);
-      const responseJson = await response.json();
-
-      if (!response.ok) {
+    settled.forEach(({ ok, responseJson }, index) => {
+      if (!ok) {
         errors.push({ index, response: responseJson });
       } else {
         cache ??= responseJson.cache;
       }
-
-      index++;
-    }
+    });
 
     return json({
       size: body.length,

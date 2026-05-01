@@ -46,28 +46,29 @@ export async function relationalQuery({
     createdAt,
   }));
 
-  for (const data of flattenedData) {
-    const { sessionId, dataKey, ...props } = data;
+  // Each flattened entry has a unique dataKey, so the writes are independent
+  // and can run in parallel rather than sequentially round-tripping the database.
+  await Promise.all(
+    flattenedData.map(async data => {
+      const { sessionId, dataKey, ...props } = data;
 
-    // Try to update existing record using compound where clause
-    // This is safer than using id from a previous query due to race conditions
-    const updateResult = await client.sessionData.updateMany({
-      where: {
-        sessionId,
-        dataKey,
-      },
-      data: {
-        ...props,
-      },
-    });
-
-    // If no record was updated, create a new one
-    if (updateResult.count === 0) {
-      await client.sessionData.create({
-        data,
+      const updateResult = await client.sessionData.updateMany({
+        where: {
+          sessionId,
+          dataKey,
+        },
+        data: {
+          ...props,
+        },
       });
-    }
-  }
+
+      if (updateResult.count === 0) {
+        await client.sessionData.create({
+          data,
+        });
+      }
+    }),
+  );
 }
 
 async function clickhouseQuery({

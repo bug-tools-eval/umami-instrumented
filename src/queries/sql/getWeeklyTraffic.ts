@@ -89,17 +89,20 @@ async function clickhouseQuery(websiteId: string, filters: QueryFilters) {
 }
 
 function formatResults(data: any) {
+  // Index rows by time once so the 7×24 grid lookup is O(1) per cell instead
+  // of O(n) (previously this scanned the full result set 168 times).
+  const byTime = new Map<string, any>();
+  for (const row of data) {
+    byTime.set(row.time, row.value);
+  }
+
   const days = [];
 
   for (let i = 0; i < 7; i++) {
     days.push([]);
 
     for (let j = 0; j < 24; j++) {
-      days[i].push(
-        Number(
-          data.find(({ time }) => time === `${i}:${j.toString().padStart(2, '0')}`)?.value || 0,
-        ),
-      );
+      days[i].push(Number(byTime.get(`${i}:${j.toString().padStart(2, '0')}`) || 0));
     }
   }
 

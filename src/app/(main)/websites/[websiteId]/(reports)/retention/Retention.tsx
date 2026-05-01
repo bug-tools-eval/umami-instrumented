@@ -25,21 +25,33 @@ export function Retention({ websiteId, days = DAYS, startDate, endDate }: Retent
     endDate,
   });
 
+  // Index the result set by `${date}:${day}` once so each cell lookup is O(1)
+  // instead of scanning the entire dataset for every (row, day) pair.
+  const dataByDateDay = (() => {
+    const map = new Map<string, any>();
+    if (data) {
+      for (const row of data as Array<{ date: any; day: number }>) {
+        map.set(`${row.date}:${row.day}`, row);
+      }
+    }
+    return map;
+  })();
+
   const rows =
     data?.reduce((arr: any[], row: { date: any; visitors: any; day: any }) => {
       const { date, visitors, day } = row;
       if (day === 0) {
+        const records: Record<number, any> = {};
+        for (const d of days) {
+          const match = dataByDateDay.get(`${date}:${d}`);
+          if (match) {
+            records[d] = match;
+          }
+        }
         return arr.concat({
           date,
           visitors,
-          records: days
-            .reduce((arr, day) => {
-              arr[day] = data.find(
-                (x: { date: any; day: number }) => x.date === date && x.day === day,
-              );
-              return arr;
-            }, [])
-            .filter(n => n),
+          records,
         });
       }
       return arr;
@@ -106,7 +118,7 @@ export function Retention({ websiteId, days = DAYS, startDate, endDate }: Retent
                       if (totalDays - rowIndex < day) {
                         return null;
                       }
-                      const percentage = records.filter(a => a.day === day)[0]?.percentage;
+                      const percentage = records[day]?.percentage;
                       return (
                         <Cell key={day}>
                           {percentage ? `${Number(percentage).toFixed(2)}%` : ''}

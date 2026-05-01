@@ -23,7 +23,10 @@ export function useDateRange(options: { ignoreOffset?: boolean; timezone?: strin
       : dateRangeObject;
   }, [date, unit, offset, options]);
 
-  const dateCompare = getCompareDate(compare, dateRange.startDate, dateRange.endDate);
+  const dateCompare = useMemo(
+    () => getCompareDate(compare, dateRange.startDate, dateRange.endDate),
+    [compare, dateRange.startDate, dateRange.endDate],
+  );
 
   return {
     date,
