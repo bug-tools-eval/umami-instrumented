@@ -1,4 +1,5 @@
 import { Column, DataColumn, DataTable, Text } from '@umami/react-zen';
+import { useMemo } from 'react';
 import { LoadingPanel } from '@/components/common/LoadingPanel';
 import { useFields, useFormat, useMessages, useResultQuery } from '@/components/hooks';
 import { formatShortTime } from '@/lib/format';
@@ -14,6 +15,9 @@ export function Breakdown({ websiteId, selectedFields = [], startDate, endDate }
   const { t, labels } = useMessages();
   const { formatValue } = useFormat();
   const { fields } = useFields();
+  // Index fields by name so each column lookup is O(1) instead of scanning
+  // the fields array per selected field on every render.
+  const fieldsByName = useMemo(() => new Map(fields.map(f => [f.name, f])), [fields]);
   const { data, error, isLoading } = useResultQuery<any>(
     'breakdown',
     {
@@ -34,7 +38,7 @@ export function Breakdown({ websiteId, selectedFields = [], startDate, endDate }
               <DataColumn
                 key={field}
                 id={field}
-                label={fields.find(f => f.name === field)?.label}
+                label={fieldsByName.get(field)?.label}
                 width="minmax(120px, 1fr)"
               >
                 {row => {

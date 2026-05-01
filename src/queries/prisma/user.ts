@@ -103,27 +103,22 @@ export async function deleteUser(userId: string) {
   const { client, transaction } = prisma;
   const cloudMode = !!process.env.CLOUD_MODE;
 
-  const websites = await client.website.findMany({
-    where: { userId },
-  });
-
-  let websiteIds = [];
-
-  if (websites.length > 0) {
-    websiteIds = websites.map(a => a.id);
-  }
-
-  const teams = await client.team.findMany({
-    where: {
-      members: {
-        some: {
-          userId,
-          role: ROLES.teamOwner,
+  // Fetch the user's websites and owned teams in parallel — independent reads.
+  const [websites, teams] = await Promise.all([
+    client.website.findMany({ where: { userId } }),
+    client.team.findMany({
+      where: {
+        members: {
+          some: {
+            userId,
+            role: ROLES.teamOwner,
+          },
         },
       },
-    },
-  });
+    }),
+  ]);
 
+  const websiteIds = websites.length > 0 ? websites.map(a => a.id) : [];
   const teamIds = teams.map(a => a.id);
 
   if (cloudMode) {

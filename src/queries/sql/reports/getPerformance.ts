@@ -44,8 +44,10 @@ async function relationalQuery(
     websiteId,
   });
 
-  const chart = await rawQuery(
-    `
+  // Chart and summary are independent — fetch them in parallel.
+  const [chart, summaryResult] = await Promise.all([
+    rawQuery(
+      `
     select
       ${getDateSQL('created_at', unit, timezone)} t,
       percentile_cont(0.5) within group (order by ${metric}) as p50,
@@ -61,11 +63,10 @@ async function relationalQuery(
     group by t
     order by t
     `,
-    { ...queryParams, startDate, endDate },
-  );
-
-  const summaryResult = await rawQuery(
-    `
+      { ...queryParams, startDate, endDate },
+    ),
+    rawQuery(
+      `
     select
       percentile_cont(0.5) within group (order by lcp) as lcp_p50,
       percentile_cont(0.75) within group (order by lcp) as lcp_p75,
@@ -91,8 +92,9 @@ async function relationalQuery(
       and website_event.created_at between {{startDate}} and {{endDate}}
       ${filterQuery}
     `,
-    { ...queryParams, startDate, endDate },
-  ).then(result => result?.[0]);
+      { ...queryParams, startDate, endDate },
+    ).then(result => result?.[0]),
+  ]);
 
   const summary = {
     lcp: {
@@ -135,8 +137,10 @@ async function clickhouseQuery(
   const { getDateSQL, rawQuery, parseFilters } = clickhouse;
   const { filterQuery, cohortQuery, queryParams } = parseFilters({ ...filters, websiteId });
 
-  const chart = await rawQuery<{ t: string; p50: number; p75: number; p95: number }[]>(
-    `
+  // Chart and summary are independent — fetch them in parallel.
+  const [chart, summaryResult] = await Promise.all([
+    rawQuery<{ t: string; p50: number; p75: number; p95: number }[]>(
+      `
     select
       ${getDateSQL('created_at', unit, timezone)} t,
       quantile(0.5)(${metric}) as p50,
@@ -151,11 +155,10 @@ async function clickhouseQuery(
     group by t
     order by t
     `,
-    { ...queryParams, startDate, endDate },
-  );
-
-  const summaryResult = await rawQuery<any>(
-    `
+      { ...queryParams, startDate, endDate },
+    ),
+    rawQuery<any>(
+      `
     select
       quantile(0.5)(lcp) as lcp_p50,
       quantile(0.75)(lcp) as lcp_p75,
@@ -180,8 +183,9 @@ async function clickhouseQuery(
       and website_event.created_at between {startDate:DateTime64} and {endDate:DateTime64}
       ${filterQuery}
     `,
-    { ...queryParams, startDate, endDate },
-  ).then(result => result?.[0]);
+      { ...queryParams, startDate, endDate },
+    ).then(result => result?.[0]),
+  ]);
 
   const summary = {
     lcp: {

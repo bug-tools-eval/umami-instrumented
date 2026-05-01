@@ -37,9 +37,13 @@ export function WorldMap({ websiteId, data, ...props }: WorldMapProps) {
     [data, mapData],
   );
 
+  // Index by country code so the per-geography lookup (~200 calls per render)
+  // is O(1) instead of an O(n) scan of the metrics array.
+  const metricsByCode = useMemo(() => new Map<string, any>(metrics.map(m => [m.x, m])), [metrics]);
+
   const getFillColor = (code: string) => {
     if (code === 'AQ') return;
-    const country = metrics?.find(({ x }) => x === code);
+    const country = metricsByCode.get(code);
 
     if (!country) {
       return colors.map.fillColor;
@@ -56,7 +60,7 @@ export function WorldMap({ websiteId, data, ...props }: WorldMapProps) {
 
   const handleHover = (code: string) => {
     if (code === 'AQ') return;
-    const country = metrics?.find(({ x }) => x === code);
+    const country = metricsByCode.get(code);
     setTooltipPopup(
       `${countryNames[code] || unknownLabel}: ${formatLongNumber(
         country?.y || 0,
