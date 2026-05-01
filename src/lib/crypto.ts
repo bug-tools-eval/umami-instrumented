@@ -12,8 +12,33 @@ const ENC_POSITION = TAG_POSITION + TAG_LENGTH;
 const HASH_ALGO = 'sha512';
 const HASH_ENCODING = 'hex';
 
-const getKey = (password: string, salt: Buffer) =>
-  crypto.pbkdf2Sync(password, salt, 10000, 32, 'sha512');
+// PBKDF2(10000, sha512) is ~7ms/call — dominant cost in parseSecureToken,
+// which runs on every authenticated request. Bearer tokens are reused
+// across requests, so the same (password, salt) pair recurs millions of
+// times. Cache by salt (password is fixed per process via APP_SECRET).
+const KEY_CACHE_LIMIT = 1024;
+const keyCache = new Map<string, Buffer>();
+
+const getKey = (password: string, salt: Buffer): Buffer => {
+  const cacheKey = `${password.length}:${salt.toString('base64')}`;
+  const cached = keyCache.get(cacheKey);
+  if (cached) {
+    // Refresh LRU position
+    keyCache.delete(cacheKey);
+    keyCache.set(cacheKey, cached);
+    return cached;
+  }
+
+  const key = crypto.pbkdf2Sync(password, salt, 10000, 32, 'sha512');
+
+  if (keyCache.size >= KEY_CACHE_LIMIT) {
+    // Evict oldest (first-inserted) entry; Map iteration order is insertion order.
+    const oldest = keyCache.keys().next().value;
+    if (oldest !== undefined) keyCache.delete(oldest);
+  }
+  keyCache.set(cacheKey, key);
+  return key;
+};
 
 export function encrypt(value: any, secret: any) {
   const iv = crypto.randomBytes(IV_LENGTH);
