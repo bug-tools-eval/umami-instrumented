@@ -45,44 +45,38 @@ async function relationalQuery(
 
   return rawQuery(
     `
-    WITH cohort_items AS (
+    WITH events AS (
       select
-        min(${getDateSQL('website_event.created_at', unit, timezone)}) as cohort_date,
-        website_event.session_id
+        website_event.session_id,
+        ${getDateSQL('website_event.created_at', unit, timezone)} as activity_date
       from website_event
       ${cohortQuery}
       ${joinSessionQuery}
       where website_event.website_id = {{websiteId::uuid}}
         and website_event.created_at between {{startDate}} and {{endDate}}
         ${filterQuery}
-      group by website_event.session_id
+      group by website_event.session_id, activity_date
     ),
-    user_activities AS (
-      select distinct
-        website_event.session_id,
-        ${getDayDiffQuery(getDateSQL('created_at', unit, timezone), 'cohort_items.cohort_date')} as day_number
-      from website_event
-      join cohort_items
-      on website_event.session_id = cohort_items.session_id
-      where website_id = {{websiteId::uuid}}
-          and created_at between {{startDate}} and {{endDate}}
-          
-      ),
+    cohort_events AS (
+      select
+        session_id,
+        activity_date,
+        min(activity_date) over (partition by session_id) as cohort_date
+      from events
+    ),
     cohort_size as (
       select cohort_date,
-        count(*) as visitors
-      from cohort_items
+        count(distinct session_id) as visitors
+      from cohort_events
       group by 1
       order by 1
     ),
     cohort_date as (
       select
-        c.cohort_date,
-        a.day_number,
-        count(*) as visitors
-      from user_activities a
-      join cohort_items c
-      on a.session_id = c.session_id
+        cohort_date,
+        ${getDayDiffQuery('activity_date', 'cohort_date')} as day_number,
+        count(distinct session_id) as visitors
+      from cohort_events
       group by 1, 2
     )
     select
@@ -119,42 +113,37 @@ async function clickhouseQuery(
 
   return rawQuery(
     `
-    WITH cohort_items AS (
+    WITH events AS (
       select
-        min(${getDateSQL('created_at', unit, timezone)}) as cohort_date,
-        session_id
+        session_id,
+        ${getDateSQL('created_at', unit, timezone)} as activity_date
       from website_event
       ${cohortQuery}
       where website_id = {websiteId:UUID}
         and created_at between {startDate:DateTime64} and {endDate:DateTime64}
         ${filterQuery}
-      group by session_id
+      group by session_id, activity_date
     ),
-    user_activities AS (
-      select distinct
-        website_event.session_id as session_id,
-        toInt32((${getDateSQL('created_at', unit, timezone)} - cohort_items.cohort_date) / 86400) as day_number
-      from website_event
-      join cohort_items
-      on website_event.session_id = cohort_items.session_id
-      where website_id = {websiteId:UUID}
-        and created_at between {startDate:DateTime64} and {endDate:DateTime64}
+    cohort_events AS (
+      select
+        session_id,
+        activity_date,
+        min(activity_date) over (partition by session_id) as cohort_date
+      from events
     ),
     cohort_size as (
       select cohort_date,
-        count(*) as visitors
-      from cohort_items
+        uniqExact(session_id) as visitors
+      from cohort_events
       group by 1
       order by 1
     ),
     cohort_date as (
       select
-        c.cohort_date,
-        a.day_number,
-        count(*) as visitors
-      from user_activities a
-      join cohort_items c
-      on a.session_id = c.session_id
+        cohort_date,
+        toInt32((activity_date - cohort_date) / 86400) as day_number,
+        uniqExact(session_id) as visitors
+      from cohort_events
       group by 1, 2
     )
     select

@@ -21,17 +21,14 @@ export async function POST(request: Request) {
   const filters = await getQueryFilters(body.filters, websiteId);
   const parameters = await setWebsiteDate(websiteId, body.parameters);
 
-  const data = {
-    utm_source: [],
-    utm_medium: [],
-    utm_campaign: [],
-    utm_term: [],
-    utm_content: [],
-  };
-
-  for (const key of UTM_PARAMS) {
-    data[key] = await getUTM(websiteId, { column: key, ...parameters } as UTMParameters, filters);
-  }
+  const data = Object.fromEntries(
+    await Promise.all(
+      UTM_PARAMS.map(async key => [
+        key,
+        await getUTM(websiteId, { column: key, ...parameters } as UTMParameters, filters),
+      ]),
+    ),
+  );
 
   return json(data);
 }

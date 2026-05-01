@@ -52,28 +52,35 @@ async function relationalQuery(
     .join('\n')
     .trim();
 
-  return rawQuery(
-    `
-    select count(distinct website_event.session_id) as num,
-    (
-      select count(distinct website_event.session_id)
+  const [goal, total] = await Promise.all([
+    rawQuery(
+      `
+      select count(distinct website_event.session_id) as num
       from website_event
       ${cohortQuery}
       ${joinSessionQuery}
       where website_event.website_id = {{websiteId::uuid}}
-      ${dateQuery}
-      ${excludeEventTypeFilterQuery}
-    ) as total
-    from website_event
-    ${cohortQuery}
-    ${joinSessionQuery}
-    where website_event.website_id = {{websiteId::uuid}}
-      and ${column} ${operator} {{value}}
-      ${dateQuery}
-      ${filterQuery}
-    `,
-    queryParams,
-  ).then(results => results?.[0]);
+        and ${column} ${operator} {{value}}
+        ${dateQuery}
+        ${filterQuery}
+      `,
+      queryParams,
+    ).then(results => results?.[0]),
+    rawQuery(
+      `
+      select count(distinct website_event.session_id) as total
+      from website_event
+      ${cohortQuery}
+      ${joinSessionQuery}
+      where website_event.website_id = {{websiteId::uuid}}
+        ${dateQuery}
+        ${excludeEventTypeFilterQuery}
+      `,
+      queryParams,
+    ).then(results => results?.[0]),
+  ]);
+
+  return { ...goal, ...total };
 }
 
 async function clickhouseQuery(
@@ -108,24 +115,31 @@ async function clickhouseQuery(
     .join('\n')
     .trim();
 
-  return rawQuery(
-    `
-    select count(distinct session_id) as num,
-    (
-      select count(distinct session_id)
+  const [goal, total] = await Promise.all([
+    rawQuery(
+      `
+      select count(distinct session_id) as num
+      from website_event
+      ${cohortQuery}
+      where website_id = {websiteId:UUID}
+        and ${column} ${operator} {value:String}
+        ${dateQuery}
+        ${filterQuery}
+      `,
+      queryParams,
+    ).then(results => results?.[0]),
+    rawQuery(
+      `
+      select count(distinct session_id) as total
       from website_event
       ${cohortQuery}
       where website_id = {websiteId:UUID}
         ${dateQuery}
         ${excludeEventTypeFilterQuery}
-    ) as total
-    from website_event
-    ${cohortQuery}
-    where website_id = {websiteId:UUID}
-      and ${column} ${operator} {value:String}
-      ${dateQuery}
-      ${filterQuery}
-    `,
-    queryParams,
-  ).then(results => results?.[0]);
+      `,
+      queryParams,
+    ).then(results => results?.[0]),
+  ]);
+
+  return { ...goal, ...total };
 }
