@@ -285,21 +285,22 @@ async function pagedQuery<T>(model: string, criteria: T, filters?: QueryFilters)
   const { page = 1, pageSize, orderBy, sortDescending = false, search } = filters || {};
   const size = +pageSize || DEFAULT_PAGE_SIZE;
 
-  const data = await client[model].findMany({
-    ...criteria,
-    ...{
-      ...(size > 0 && { take: +size, skip: +size * (+page - 1) }),
-      ...(orderBy && {
-        orderBy: [
-          {
-            [orderBy]: sortDescending ? 'desc' : 'asc',
-          },
-        ],
-      }),
-    },
-  });
-
-  const count = await client[model].count({ where: (criteria as any).where });
+  const [data, count] = await Promise.all([
+    client[model].findMany({
+      ...criteria,
+      ...{
+        ...(size > 0 && { take: +size, skip: +size * (+page - 1) }),
+        ...(orderBy && {
+          orderBy: [
+            {
+              [orderBy]: sortDescending ? 'desc' : 'asc',
+            },
+          ],
+        }),
+      },
+    }),
+    client[model].count({ where: (criteria as any).where }),
+  ]);
 
   return { data, count, page: +page, pageSize: size, orderBy, search };
 }
@@ -322,11 +323,10 @@ async function pagedRawQuery(
     .filter(n => n)
     .join('\n');
 
-  const count = await rawQuery(`select count(*) as num from (${query}) t`, queryParams).then(
-    res => res[0].num,
-  );
-
-  const data = await rawQuery(`${query}${statements}`, queryParams, name);
+  const [count, data] = await Promise.all([
+    rawQuery(`select count(*) as num from (${query}) t`, queryParams).then(res => res[0].num),
+    rawQuery(`${query}${statements}`, queryParams, name),
+  ]);
 
   return { data, count, page: +page, pageSize: size, orderBy };
 }

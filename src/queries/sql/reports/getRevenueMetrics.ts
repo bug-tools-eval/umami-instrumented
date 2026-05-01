@@ -55,8 +55,9 @@ async function relationalQuery(
           and website_event.event_id = revenue.event_id`
       : '';
 
-  const country = await rawQuery(
-    `
+  const [country, region, referrer, channel] = await Promise.all([
+    rawQuery(
+      `
     select
       session.country as "name",
       sum(revenue) as "value"
@@ -73,11 +74,11 @@ async function relationalQuery(
     group by session.country
     order by value desc
     `,
-    queryParams,
-  );
+      queryParams,
+    ),
 
-  const region = await rawQuery(
-    `
+    rawQuery(
+      `
     select
       session.country,
       session.region as "name",
@@ -95,11 +96,11 @@ async function relationalQuery(
     group by session.country, session.region
     order by value desc
     `,
-    queryParams,
-  );
+      queryParams,
+    ),
 
-  const referrer = await rawQuery(
-    `
+    rawQuery(
+      `
     WITH events AS (
       select
         revenue.website_id,
@@ -145,11 +146,11 @@ async function relationalQuery(
     group by we.referrer_domain
     order by value desc
     `,
-    queryParams,
-  );
+      queryParams,
+    ),
 
-  const channel = await rawQuery(
-    `
+    rawQuery(
+      `
     WITH events AS (
       select
         revenue.website_id,
@@ -225,8 +226,9 @@ async function relationalQuery(
     group by name
     order by value desc
     `,
-    queryParams,
-  );
+      queryParams,
+    ),
+  ]);
 
   return { country, region, referrer, channel };
 }
@@ -258,8 +260,9 @@ async function clickhouseQuery(
       and website_event.event_id = website_revenue.event_id`
     : '';
 
-  const country = await rawQuery<{ name: string; value: number }[]>(
-    `
+  const [country, region, referrer, channel] = await Promise.all([
+    rawQuery<{ name: string; value: number }[]>(
+      `
       select
         website_event.country as "name",
         sum(website_revenue.revenue) as "value"
@@ -281,11 +284,11 @@ async function clickhouseQuery(
       group by website_event.country
       order by value desc
     `,
-    queryParams,
-  );
+      queryParams,
+    ),
 
-  const region = await rawQuery<{ name: string; value: number; country: string }[]>(
-    `
+    rawQuery<{ name: string; value: number; country: string }[]>(
+      `
       select
         website_event.country,
         website_event.region as "name",
@@ -308,11 +311,11 @@ async function clickhouseQuery(
       group by 1,2
       order by value desc
     `,
-    queryParams,
-  );
+      queryParams,
+    ),
 
-  const referrer = await rawQuery<{ name: string; value: number }[]>(
-    `
+    rawQuery<{ name: string; value: number }[]>(
+      `
     WITH events AS (
     select distinct
         website_id,
@@ -357,11 +360,11 @@ async function clickhouseQuery(
     group by 1
     order by value desc
     `,
-    queryParams,
-  );
+      queryParams,
+    ),
 
-  const channel = await rawQuery<{ name: string; value: number }[]>(
-    `
+    rawQuery<{ name: string; value: number }[]>(
+      `
     WITH events AS (
     select distinct
         website_id,
@@ -436,8 +439,9 @@ async function clickhouseQuery(
     group by 1
     order by value desc;
     `,
-    queryParams,
-  );
+      queryParams,
+    ),
+  ]);
 
   return { country, region, referrer, channel };
 }
