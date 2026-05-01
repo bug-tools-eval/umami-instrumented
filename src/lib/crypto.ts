@@ -78,8 +78,12 @@ export function md5(...args: string[]) {
   return crypto.createHash('md5').update(args.join('')).digest('hex');
 }
 
+let cachedSecret: string | undefined;
 export function secret() {
-  return hash(process.env.APP_SECRET || process.env.DATABASE_URL);
+  if (cachedSecret === undefined) {
+    cachedSecret = hash(process.env.APP_SECRET || process.env.DATABASE_URL);
+  }
+  return cachedSecret;
 }
 
 export function uuid(...args: any) {

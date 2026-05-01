@@ -16,7 +16,9 @@ export async function parseRequest(
 ): Promise<any> {
   const url = new URL(request.url);
   let query = Object.fromEntries(url.searchParams);
-  let body = await getJsonBody(request);
+  // Skip body parsing on GET — Request.clone()+.json() over an empty body
+  // costs ~17µs on every authed dashboard poll for nothing.
+  let body = request.method === 'GET' ? undefined : await getJsonBody(request);
   let error: () => undefined | undefined | Response;
   let auth = null;
 
