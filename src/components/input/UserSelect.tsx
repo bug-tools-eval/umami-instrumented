@@ -23,8 +23,8 @@ export function UserSelect({
     if (!teamId || !teamMembers) {
       return users.data;
     }
-    const teamMemberIds = teamMembers.data.map(({ userId }) => userId);
-    return users.data.filter(({ id }) => !teamMemberIds.includes(id));
+    const teamMemberIds = new Set(teamMembers.data.map(({ userId }) => userId));
+    return users.data.filter(({ id }) => !teamMemberIds.has(id));
   }, [users, teamMembers, teamId]);
 
   const handleSearch = (value: string) => {

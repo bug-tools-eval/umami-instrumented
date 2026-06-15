@@ -5,8 +5,10 @@ import { useMessages, useWebsiteExpandedMetricsQuery } from '@/components/hooks'
 import { X } from '@/components/icons';
 import { DownloadButton } from '@/components/input/DownloadButton';
 import { MetricLabel } from '@/components/metrics/MetricLabel';
-import { SESSION_COLUMNS } from '@/lib/constants';
+import { SESSION_COLUMN_SET } from '@/lib/constants';
 import { formatShortTime } from '@/lib/format';
+
+const SEARCH_DISABLED_TYPES = new Set(['browser', 'country', 'device', 'os']);
 
 export interface MetricsExpandedTableProps {
   websiteId: string;
@@ -34,8 +36,8 @@ export function MetricsExpandedTable({
 }: MetricsExpandedTableProps) {
   const [search, setSearch] = useState('');
   const { t, labels } = useMessages();
-  const isType = ['browser', 'country', 'device', 'os'].includes(type);
-  const showBounceDuration = SESSION_COLUMNS.includes(type);
+  const isType = SEARCH_DISABLED_TYPES.has(type);
+  const showBounceDuration = SESSION_COLUMN_SET.has(type);
 
   const { data, isLoading, isFetching, error } = useWebsiteExpandedMetricsQuery(websiteId, {
     type,

@@ -1,4 +1,9 @@
-import { EVENT_COLUMNS, FILTER_COLUMNS, SEGMENT_TYPES, SESSION_COLUMNS } from '@/lib/constants';
+import {
+  EVENT_COLUMN_SET,
+  FILTER_COLUMNS,
+  SEGMENT_TYPES,
+  SESSION_COLUMN_SET,
+} from '@/lib/constants';
 import { getQueryFilters, parseRequest } from '@/lib/request';
 import { badRequest, json, unauthorized } from '@/lib/response';
 import { fieldsParam, searchParams, withDateRange } from '@/lib/schema';
@@ -29,7 +34,7 @@ export async function GET(
 
   const { type } = query;
 
-  if (!SESSION_COLUMNS.includes(type) && !EVENT_COLUMNS.includes(type) && !SEGMENT_TYPES[type]) {
+  if (!SESSION_COLUMN_SET.has(type) && !EVENT_COLUMN_SET.has(type) && !SEGMENT_TYPES[type]) {
     return badRequest();
   }
 

@@ -43,7 +43,7 @@ export function WebsiteChart({
         },
       }),
     };
-  }, [data, startDate, endDate, unit]);
+  }, [data]);
 
   return (
     <LoadingPanel data={data} isFetching={isFetching} isLoading={isLoading} error={error}>

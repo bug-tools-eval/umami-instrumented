@@ -17,14 +17,17 @@ export function EventProperties({ websiteId }: { websiteId: string }) {
   const { t, labels } = useMessages();
   const { data, isLoading, isFetching, error } = useEventDataPropertiesQuery(websiteId);
 
-  const events: string[] = data
-    ? data.reduce((arr: string | any[], e: { eventName: any }) => {
-        return !arr.includes(e.eventName) ? arr.concat(e.eventName) : arr;
-      }, [])
-    : [];
-  const properties: string[] = eventName
-    ? data?.filter(e => e.eventName === eventName).map(e => e.propertyName)
-    : [];
+  const events: string[] = useMemo(() => {
+    return data ? [...new Set<string>(data.map(({ eventName }) => eventName))] : [];
+  }, [data]);
+
+  const properties: string[] = useMemo(() => {
+    return eventName
+      ? data
+          ?.filter(({ eventName: name }) => name === eventName)
+          .map(({ propertyName }) => propertyName)
+      : [];
+  }, [data, eventName]);
 
   return (
     <LoadingPanel

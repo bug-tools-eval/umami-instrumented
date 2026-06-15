@@ -1,6 +1,6 @@
 import clickhouse from '@/lib/clickhouse';
-import { EVENT_COLUMNS } from '@/lib/constants';
 import { CLICKHOUSE, PRISMA, runQuery } from '@/lib/db';
+import { hasEventFilter } from '@/lib/params';
 import prisma from '@/lib/prisma';
 import type { QueryFilters } from '@/lib/types';
 
@@ -83,7 +83,7 @@ async function clickhouseQuery(
   const { excludeBounce } = filters;
   const bounceQuery = excludeBounce ? '0' : 'sumIf(1, t.c = 1)';
 
-  if (EVENT_COLUMNS.some(item => Object.keys(filters).includes(item))) {
+  if (hasEventFilter(filters)) {
     sql = `
     select
       sum(t.c) as "pageviews",

@@ -32,6 +32,15 @@ test('formatLongNumber', () => {
   expect(format.formatLongNumber(1200)).toBe('1.20k');
 });
 
+test('formatCurrency', () => {
+  expect(format.formatCurrency(12.5, 'USD', 'en-US')).toBe('$12.50');
+  expect(format.formatCurrency(12.5, 'INVALID', 'en-US')).toBe('$12.50');
+});
+
+test('formatLongCurrency', () => {
+  expect(format.formatLongCurrency(1200, 'USD', 'en-US')).toBe('$1.20k');
+});
+
 test('stringToColor', () => {
   expect(format.stringToColor('hello')).toBe('#d218e9');
   expect(format.stringToColor('goodbye')).toBe('#11e956');

@@ -52,19 +52,84 @@ export function Journey({ websiteId, steps, startStep, endStep, view }: JourneyP
     const selectedPaths = selectedNode?.paths ?? [];
     const activePaths = activeNode?.paths ?? [];
     const columns = [];
+    const stepCount = +steps;
+    const pathsByColumn = Array.from({ length: stepCount }, () => new Map<string, any[]>());
+    const selectedNamesByColumn = Array.from({ length: stepCount }, () => new Set<string>());
+    const activeNamesByColumn = Array.from({ length: stepCount }, () => new Set<string>());
+    const selectedTransitionCounts = Array.from(
+      { length: stepCount },
+      () => new Map<string, number>(),
+    );
+    const activeTransitionsByColumn = Array.from({ length: stepCount }, () => new Set<string>());
 
-    for (let columnIndex = 0; columnIndex < +steps; columnIndex++) {
+    for (const path of data) {
+      for (let columnIndex = 0; columnIndex < stepCount; columnIndex++) {
+        const name = path.items[columnIndex];
+
+        if (!name) {
+          continue;
+        }
+
+        const paths = pathsByColumn[columnIndex].get(name);
+
+        if (paths) {
+          paths.push(path);
+        } else {
+          pathsByColumn[columnIndex].set(name, [path]);
+        }
+      }
+    }
+
+    for (const path of selectedPaths) {
+      for (let columnIndex = 0; columnIndex < stepCount; columnIndex++) {
+        const name = path.items[columnIndex];
+
+        if (name) {
+          selectedNamesByColumn[columnIndex].add(name);
+        }
+
+        if (columnIndex > 0) {
+          const previousName = path.items[columnIndex - 1];
+
+          if (previousName && name) {
+            const key = `${previousName}\0${name}`;
+            const counts = selectedTransitionCounts[columnIndex];
+            counts.set(key, (counts.get(key) || 0) + path.count);
+          }
+        }
+      }
+    }
+
+    for (const path of activePaths) {
+      for (let columnIndex = 0; columnIndex < stepCount; columnIndex++) {
+        const name = path.items[columnIndex];
+
+        if (name) {
+          activeNamesByColumn[columnIndex].add(name);
+        }
+
+        if (columnIndex > 0) {
+          const previousName = path.items[columnIndex - 1];
+
+          if (previousName && name) {
+            activeTransitionsByColumn[columnIndex].add(`${previousName}\0${name}`);
+          }
+        }
+      }
+    }
+
+    for (let columnIndex = 0; columnIndex < stepCount; columnIndex++) {
       const nodes = {};
 
       data.forEach(({ items, count }: any, nodeIndex: any) => {
         const name = items[columnIndex];
 
         if (name) {
-          const selected = !!selectedPaths.find(({ items }) => items[columnIndex] === name);
-          const active = selected && !!activePaths.find(({ items }) => items[columnIndex] === name);
+          const selected = selectedNamesByColumn[columnIndex].has(name);
+          const active = selected && activeNamesByColumn[columnIndex].has(name);
 
           if (!nodes[name]) {
-            const paths = data.filter(({ items }) => items[columnIndex] === name);
+            const paths = pathsByColumn[columnIndex].get(name);
 
             nodes[name] = {
               name,
@@ -102,18 +167,15 @@ export function Journey({ websiteId, steps, startStep, endStep, view }: JourneyP
 
           const lines =
             previousNodes?.reduce((arr: any[][], previousNode: any, previousNodeIndex: number) => {
-              const fromCount = selectedNode?.paths.reduce((sum, path) => {
-                if (
-                  previousNode.name === path.items[columnIndex - 1] &&
-                  currentNode.name === path.items[columnIndex]
-                ) {
-                  sum += path.count;
-                }
-                return sum;
-              }, 0);
+              const transitionKey = `${previousNode.name}\0${currentNode.name}`;
+              const fromCount = selectedTransitionCounts[columnIndex].get(transitionKey);
 
               if (currentNode.selected && previousNode.selected && fromCount) {
-                arr.push([previousNodeIndex, currentNodeIndex]);
+                arr.push([
+                  previousNodeIndex,
+                  currentNodeIndex,
+                  activeTransitionsByColumn[columnIndex].has(transitionKey),
+                ]);
                 selectedCount += fromCount;
 
                 if (previousNode.active) {
@@ -150,7 +212,7 @@ export function Journey({ websiteId, steps, startStep, endStep, view }: JourneyP
     });
 
     return columns;
-  }, [data, selectedNode, activeNode]);
+  }, [data, selectedNode, activeNode, steps]);
 
   const handleClick = (name: string, columnIndex: number, paths: any[]) => {
     if (name !== selectedNode?.name || columnIndex !== selectedNode?.columnIndex) {
@@ -248,7 +310,7 @@ export function Journey({ websiteId, steps, startStep, endStep, view }: JourneyP
                               </TooltipTrigger>
                             </div>
                             {columnIndex < columns.length &&
-                              lines.map(([fromIndex, nodeIndex], i) => {
+                              lines.map(([fromIndex, nodeIndex, activeLine], i) => {
                                 const height =
                                   (Math.abs(nodeIndex - fromIndex) + 1) * (NODE_HEIGHT + NODE_GAP) -
                                   NODE_GAP;
@@ -256,19 +318,12 @@ export function Journey({ websiteId, steps, startStep, endStep, view }: JourneyP
                                   (Math.abs(nodeIndex - fromIndex) - 1) * (NODE_HEIGHT + NODE_GAP) +
                                   NODE_GAP +
                                   LINE_WIDTH;
-                                const nodeName = columns[columnIndex - 1]?.nodes[fromIndex].name;
 
                                 return (
                                   <div
                                     key={`${fromIndex}${nodeIndex}${i}`}
                                     className={classNames(styles.line, {
-                                      [styles.active]:
-                                        active &&
-                                        activeNode?.paths.find(
-                                          (path: { items: any[] }) =>
-                                            path.items[columnIndex] === name &&
-                                            path.items[columnIndex - 1] === nodeName,
-                                        ),
+                                      [styles.active]: active && activeLine,
                                       [styles.up]: fromIndex < nodeIndex,
                                       [styles.down]: fromIndex > nodeIndex,
                                       [styles.flat]: fromIndex === nodeIndex,

@@ -1,6 +1,7 @@
 import clickhouse from '@/lib/clickhouse';
-import { EVENT_COLUMNS, FILTER_COLUMNS, SESSION_COLUMNS } from '@/lib/constants';
+import { FILTER_COLUMNS, SESSION_COLUMN_SET } from '@/lib/constants';
 import { CLICKHOUSE, PRISMA, runQuery } from '@/lib/db';
+import { hasEventFilter } from '@/lib/params';
 import prisma from '@/lib/prisma';
 import type { QueryFilters } from '@/lib/types';
 
@@ -40,7 +41,7 @@ async function relationalQuery(
         ...filters,
         websiteId,
       },
-      { joinSession: SESSION_COLUMNS.includes(type) },
+      { joinSession: SESSION_COLUMN_SET.has(type) },
     );
 
   let entryExitQuery = '';
@@ -111,7 +112,7 @@ async function clickhouseQuery(
   let sql = '';
   let excludeDomain = '';
 
-  if (EVENT_COLUMNS.some(item => Object.keys(filters).includes(item))) {
+  if (hasEventFilter(filters)) {
     let entryExitQuery = '';
 
     if (column === 'referrer_domain') {

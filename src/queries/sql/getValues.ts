@@ -28,8 +28,10 @@ async function relationalQuery(websiteId: string, column: string, filters: Query
   }
 
   if (search) {
-    if (decodeURIComponent(search).includes(',')) {
-      searchQuery = `AND (${decodeURIComponent(search)
+    const decodedSearch = decodeURIComponent(search);
+
+    if (decodedSearch.includes(',')) {
+      searchQuery = `AND (${decodedSearch
         .split(',')
         .slice(0, 5)
         .map((value: string, index: number) => {
@@ -84,12 +86,10 @@ async function clickhouseQuery(websiteId: string, column: string, filters: Query
   }
 
   if (search) {
-    searchQuery = `and positionCaseInsensitive(${column}, {search:String}) > 0`;
-  }
+    const decodedSearch = decodeURIComponent(search);
 
-  if (search) {
-    if (decodeURIComponent(search).includes(',')) {
-      searchQuery = `AND (${decodeURIComponent(search)
+    if (decodedSearch.includes(',')) {
+      searchQuery = `AND (${decodedSearch
         .split(',')
         .slice(0, 5)
         .map((value: string, index: number) => {

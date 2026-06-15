@@ -1,5 +1,5 @@
 import { Column, Grid, Icon, Row, Text } from '@umami/react-zen';
-import type { ReactNode } from 'react';
+import { type ReactNode, useMemo } from 'react';
 import { LoadingPanel } from '@/components/common/LoadingPanel';
 import { Panel } from '@/components/common/Panel';
 import { useLocale, useMessages, useResultQuery } from '@/components/hooks';
@@ -25,25 +25,32 @@ export function Retention({ websiteId, days = DAYS, startDate, endDate }: Retent
     endDate,
   });
 
-  const rows =
-    data?.reduce((arr: any[], row: { date: any; visitors: any; day: any }) => {
-      const { date, visitors, day } = row;
-      if (day === 0) {
-        return arr.concat({
-          date,
-          visitors,
-          records: days
-            .reduce((arr, day) => {
-              arr[day] = data.find(
-                (x: { date: any; day: number }) => x.date === date && x.day === day,
-              );
-              return arr;
-            }, [])
-            .filter(n => n),
-        });
+  const rows = useMemo(() => {
+    if (!data) {
+      return [];
+    }
+
+    const recordsByDate = new Map<string, Map<number, any>>();
+
+    for (const row of data as { date: string; day: number }[]) {
+      let records = recordsByDate.get(row.date);
+
+      if (!records) {
+        records = new Map();
+        recordsByDate.set(row.date, records);
       }
-      return arr;
-    }, []) || [];
+
+      records.set(row.day, row);
+    }
+
+    return (data as { date: string; visitors: number; day: number }[])
+      .filter(({ day }) => day === 0)
+      .map(({ date, visitors }) => ({
+        date,
+        visitors,
+        records: recordsByDate.get(date),
+      }));
+  }, [data]);
 
   const totalDays = rows.length;
 
@@ -106,7 +113,7 @@ export function Retention({ websiteId, days = DAYS, startDate, endDate }: Retent
                       if (totalDays - rowIndex < day) {
                         return null;
                       }
-                      const percentage = records.filter(a => a.day === day)[0]?.percentage;
+                      const percentage = records.get(day)?.percentage;
                       return (
                         <Cell key={day}>
                           {percentage ? `${Number(percentage).toFixed(2)}%` : ''}

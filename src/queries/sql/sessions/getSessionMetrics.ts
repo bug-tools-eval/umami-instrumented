@@ -1,6 +1,7 @@
 import clickhouse from '@/lib/clickhouse';
-import { EVENT_COLUMNS, FILTER_COLUMNS, SESSION_COLUMNS } from '@/lib/constants';
+import { FILTER_COLUMNS, SESSION_COLUMN_SET } from '@/lib/constants';
 import { CLICKHOUSE, PRISMA, runQuery } from '@/lib/db';
+import { hasEventFilter } from '@/lib/params';
 import prisma from '@/lib/prisma';
 import type { QueryFilters } from '@/lib/types';
 
@@ -36,7 +37,7 @@ async function relationalQuery(
         websiteId,
       },
       {
-        joinSession: SESSION_COLUMNS.includes(type),
+        joinSession: SESSION_COLUMN_SET.has(type),
       },
     );
   const includeCountry = column === 'city' || column === 'region';
@@ -91,7 +92,7 @@ async function clickhouseQuery(
 
   let sql = '';
 
-  if (EVENT_COLUMNS.some(item => Object.keys(filters).includes(item))) {
+  if (hasEventFilter(filters)) {
     sql = `
     select
       ${column} x,

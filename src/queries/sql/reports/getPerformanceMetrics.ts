@@ -1,5 +1,5 @@
 import clickhouse from '@/lib/clickhouse';
-import { SESSION_COLUMNS } from '@/lib/constants';
+import { SESSION_COLUMN_SET } from '@/lib/constants';
 import { CLICKHOUSE, PRISMA, runQuery } from '@/lib/db';
 import prisma from '@/lib/prisma';
 import type { QueryFilters } from '@/lib/types';
@@ -39,7 +39,7 @@ async function relationalQuery(
   const { rawQuery, parseFilters } = prisma;
   const { filterQuery, joinSessionQuery, cohortQuery, queryParams } = parseFilters(
     { ...filters, websiteId },
-    { joinSession: SESSION_COLUMNS.includes(column) },
+    { joinSession: SESSION_COLUMN_SET.has(column) },
   );
 
   return rawQuery(

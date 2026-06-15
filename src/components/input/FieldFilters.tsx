@@ -16,7 +16,7 @@ import {
   Select,
 } from '@umami/react-zen';
 import { endOfDay, subMonths } from 'date-fns';
-import type { Key } from 'react';
+import { type Key, useMemo } from 'react';
 import { Empty } from '@/components/common/Empty';
 import { FilterRecord } from '@/components/common/FilterRecord';
 import { type FieldGroup, useFields, useMessages, useMobile } from '@/components/hooks';
@@ -31,10 +31,12 @@ export interface FieldFiltersProps {
   onMatchChange?: (match: string) => void;
 }
 
+const EMPTY_EXCLUDE: string[] = [];
+
 export function FieldFilters({
   websiteId,
   value,
-  exclude = [],
+  exclude = EMPTY_EXCLUDE,
   match = 'all',
   onChange,
   onMatchChange,
@@ -45,10 +47,15 @@ export function FieldFilters({
   const endDate = endOfDay(new Date());
   const { isMobile } = useMobile();
 
-  const groupedFields = fields
-    .filter(({ name }) => !exclude.includes(name))
-    .reduce(
+  const groupedFields = useMemo(() => {
+    const excludedFields = exclude.length ? new Set(exclude) : null;
+
+    return fields.reduce(
       (acc, field) => {
+        if (excludedFields?.has(field.name)) {
+          return acc;
+        }
+
         const group = field.group;
         if (!acc[group]) {
           acc[group] = [];
@@ -58,6 +65,7 @@ export function FieldFilters({
       },
       {} as Record<FieldGroup, typeof fields>,
     );
+  }, [exclude, fields]);
 
   const updateFilter = (index: number, props: Record<string, any>) => {
     onChange(value.map((filter, i) => (i === index ? { ...filter, ...props } : filter)));

@@ -54,6 +54,7 @@ async function clickhouseQuery(data: SaveEventDataArgs) {
   const { sendMessage } = kafka;
 
   const jsonKeys = flattenJSON(eventData);
+  const createdAtString = getUTCString(createdAt);
 
   const messages = jsonKeys.map(({ key, value, dataType }) => {
     return {
@@ -67,7 +68,7 @@ async function clickhouseQuery(data: SaveEventDataArgs) {
       string_value: getStringValue(value, dataType),
       number_value: dataType === DATA_TYPE.number ? value : null,
       date_value: dataType === DATA_TYPE.date ? getUTCString(value) : null,
-      created_at: getUTCString(createdAt),
+      created_at: createdAtString,
     };
   });
 

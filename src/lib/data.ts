@@ -6,22 +6,20 @@ export function flattenJSON(
   keyValues: { key: string; value: any; dataType: DynamicDataType }[] = [],
   parentKey = '',
 ): { key: string; value: any; dataType: DynamicDataType }[] {
-  return Object.keys(eventData).reduce(
-    (acc, key) => {
-      const value = eventData[key];
-      const type = typeof eventData[key];
+  for (const key of Object.keys(eventData)) {
+    const value = eventData[key];
+    const type = typeof value;
+    const keyName = getKeyName(key, parentKey);
 
-      // nested object
-      if (value && type === 'object' && !Array.isArray(value) && !isValidDateValue(value)) {
-        flattenJSON(value, acc.keyValues, getKeyName(key, parentKey));
-      } else {
-        createKey(getKeyName(key, parentKey), value, acc);
-      }
+    // nested object
+    if (value && type === 'object' && !Array.isArray(value) && !isValidDateValue(value)) {
+      flattenJSON(value, keyValues, keyName);
+    } else {
+      createKey(keyName, value, keyValues);
+    }
+  }
 
-      return acc;
-    },
-    { keyValues, parentKey },
-  ).keyValues;
+  return keyValues;
 }
 
 export function isValidDateValue(value: string) {
@@ -50,7 +48,7 @@ export function getStringValue(value: string, dataType: number) {
   return value;
 }
 
-function createKey(key: string, value: string, acc: { keyValues: any[]; parentKey: string }) {
+function createKey(key: string, value: string, keyValues: any[]) {
   const type = getDataType(value);
 
   let dataType = null;
@@ -78,7 +76,7 @@ function createKey(key: string, value: string, acc: { keyValues: any[]; parentKe
       break;
   }
 
-  acc.keyValues.push({ key, value, dataType });
+  keyValues.push({ key, value, dataType });
 }
 
 function getKeyName(key: string, parentKey: string) {
@@ -90,5 +88,5 @@ function getKeyName(key: string, parentKey: string) {
 }
 
 export function objectToArray(obj: object) {
-  return Object.keys(obj).map(key => obj[key]);
+  return Object.values(obj);
 }

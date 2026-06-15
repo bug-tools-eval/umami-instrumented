@@ -109,16 +109,26 @@ const TIMEZONE_MAPPINGS: Record<string, string> = {
   'Asia/Calcutta': 'Asia/Kolkata',
 };
 
+const timezoneValidationCache = new Map<string, boolean>();
+
 export function normalizeTimezone(timezone: string): string {
   return TIMEZONE_MAPPINGS[timezone] || timezone;
 }
 
 export function isValidTimezone(timezone: string) {
+  const cached = timezoneValidationCache.get(timezone);
+
+  if (cached !== undefined) {
+    return cached;
+  }
+
   try {
     const normalizedTimezone = normalizeTimezone(timezone);
     Intl.DateTimeFormat(undefined, { timeZone: normalizedTimezone });
+    timezoneValidationCache.set(timezone, true);
     return true;
   } catch {
+    timezoneValidationCache.set(timezone, false);
     return false;
   }
 }
@@ -356,24 +366,25 @@ export function generateTimeSeries(
   const add = DATE_FUNCTIONS[unit].add;
   const start = DATE_FUNCTIONS[unit].start;
   const fmt = DATE_FORMATS[unit];
+  const dateLocale = getDateLocale(locale);
+  const formatSeriesDate = (value: string | number | Date) =>
+    format(typeof value === 'string' ? new Date(value) : value, fmt, { locale: dateLocale });
 
   let current = start(minDate);
   const end = start(maxDate);
 
-  const timeseries: string[] = [];
+  const lookup = new Map(data.map(({ x, y, d }) => [formatSeriesDate(x), { x, y, d }]));
+  const timeseries = [];
 
   while (isBefore(current, end) || isEqual(current, end)) {
-    timeseries.push(formatDate(current, fmt, locale));
+    const t = formatSeriesDate(current);
+    const { x, y, d } = lookup.get(t) || {};
+
+    timeseries.push({ x: t, d: d ?? x, y: y ?? null });
     current = add(current, 1);
   }
 
-  const lookup = new Map(data.map(({ x, y, d }) => [formatDate(x, fmt, locale), { x, y, d }]));
-
-  return timeseries.map(t => {
-    const { x, y, d } = lookup.get(t) || {};
-
-    return { x: t, d: d ?? x, y: y ?? null };
-  });
+  return timeseries;
 }
 
 export function getDateRangeValue(startDate: Date, endDate: Date) {

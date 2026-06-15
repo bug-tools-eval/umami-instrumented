@@ -6,26 +6,51 @@ const countryNames = {
   'en-US': enUS,
 };
 
+const countryNameRequests: Record<string, Promise<Record<string, string>>> = {};
+
+function loadCountryNames(locale: string) {
+  if (!countryNameRequests[locale]) {
+    countryNameRequests[locale] = httpGet(
+      `${process.env.basePath || ''}/intl/country/${locale}.json`,
+    )
+      .then(({ data }) => {
+        if (data) {
+          countryNames[locale] = data;
+
+          return data;
+        }
+
+        return enUS;
+      })
+      .catch(() => enUS)
+      .finally(() => {
+        delete countryNameRequests[locale];
+      });
+  }
+
+  return countryNameRequests[locale];
+}
+
 export function useCountryNames(locale: string) {
   const [list, setList] = useState(countryNames[locale] || enUS);
 
-  async function loadData(locale: string) {
-    const { data } = await httpGet(`${process.env.basePath || ''}/intl/country/${locale}.json`);
-
-    if (data) {
-      countryNames[locale] = data;
-      setList(countryNames[locale]);
-    } else {
-      setList(enUS);
-    }
-  }
-
   useEffect(() => {
-    if (!countryNames[locale]) {
-      loadData(locale);
-    } else {
+    let mounted = true;
+
+    if (countryNames[locale]) {
       setList(countryNames[locale]);
+      return;
     }
+
+    loadCountryNames(locale).then(data => {
+      if (mounted) {
+        setList(data);
+      }
+    });
+
+    return () => {
+      mounted = false;
+    };
   }, [locale]);
 
   return { countryNames: list };

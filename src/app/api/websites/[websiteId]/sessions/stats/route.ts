@@ -31,12 +31,13 @@ export async function GET(
 
   const metrics = await getWebsiteSessionStats(websiteId, filters);
 
-  const data = Object.keys(metrics[0]).reduce((obj, key) => {
-    obj[key] = {
+  const data = {};
+
+  for (const key of Object.keys(metrics[0])) {
+    data[key] = {
       value: Number(metrics[0][key]) || 0,
     };
-    return obj;
-  }, {});
+  }
 
   return json(data);
 }

@@ -1,5 +1,4 @@
 import { Column, Heading, Row, SearchField, Text } from '@umami/react-zen';
-import Link from '@/components/common/Link';
 import { useMemo, useState } from 'react';
 import { FixedSizeList } from 'react-window';
 import { SessionModal } from '@/app/(main)/websites/[websiteId]/sessions/SessionModal';
@@ -7,6 +6,7 @@ import { useFormat } from '@/components//hooks/useFormat';
 import { Avatar } from '@/components/common/Avatar';
 import { Empty } from '@/components/common/Empty';
 import { IconLabel } from '@/components/common/IconLabel';
+import Link from '@/components/common/Link';
 import {
   useCountryNames,
   useLocale,
@@ -147,27 +147,20 @@ export function RealtimeLog({ data }: { data: any }) {
       return [];
     }
 
+    const searchValue = search.trim().toLowerCase();
     let logs = data.events;
 
-    if (search) {
-      logs = logs.filter(({ eventName, urlPath, browser, os, country, device }) => {
-        return [
-          eventName,
-          urlPath,
-          os,
-          formatValue(browser, 'browser'),
-          formatValue(country, 'country'),
-          formatValue(device, 'device'),
-        ]
-          .filter(n => n)
-          .map(n => n.toLowerCase())
-          .join('')
-          .includes(search.toLowerCase());
-      });
+    if (filter !== TYPE_ALL) {
+      logs = logs.filter(({ __type }) => __type === filter);
     }
 
-    if (filter !== TYPE_ALL) {
-      return logs.filter(({ __type }) => __type === filter);
+    if (searchValue) {
+      logs = logs.filter(({ eventName, urlPath, browser, os, country, device }) => {
+        const text =
+          `${eventName || ''}${urlPath || ''}${os || ''}${formatValue(browser, 'browser') || ''}${formatValue(country, 'country') || ''}${formatValue(device, 'device') || ''}`.toLowerCase();
+
+        return text.includes(searchValue);
+      });
     }
 
     return logs;

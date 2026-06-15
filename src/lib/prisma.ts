@@ -2,7 +2,13 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { readReplicas } from '@prisma/extension-read-replicas';
 import debug from 'debug';
 import { PrismaClient } from '@/generated/prisma/client';
-import { DEFAULT_PAGE_SIZE, FILTER_COLUMNS, OPERATORS, SESSION_COLUMNS } from './constants';
+import {
+  DEFAULT_PAGE_SIZE,
+  FILTER_COLUMNS,
+  OPERATORS,
+  SESSION_COLUMN_SET,
+  SESSION_COLUMNS,
+} from './constants';
 import { filtersObjectToArray } from './params';
 import type { Operator, QueryFilters, QueryOptions } from './types';
 
@@ -34,6 +40,10 @@ const DATE_FORMATS_UTC = {
   month: 'YYYY-MM-01"T"HH24:00:00"Z"',
   year: 'YYYY-01-01"T"HH24:00:00"Z"',
 };
+
+const JOIN_SESSION_FILTERS = new Set(['referrer', ...SESSION_COLUMNS]);
+const EQUALS_OPERATORS = new Set<Operator>([OPERATORS.equals, OPERATORS.notEquals]);
+const SEARCH_OPERATORS = new Set<Operator>([OPERATORS.contains, OPERATORS.doesNotContain]);
 
 function getAddIntervalQuery(field: string, interval: string): string {
   return `${field} + interval '${interval}'`;
@@ -85,7 +95,7 @@ function mapFilter(
     name = name.slice('cohort_'.length);
   }
 
-  const table = SESSION_COLUMNS.includes(name) ? 'session' : 'website_event';
+  const table = SESSION_COLUMN_SET.has(name) ? 'session' : 'website_event';
 
   switch (operator) {
     case OPERATORS.equals:
@@ -216,9 +226,9 @@ function getQueryParams(filters: Record<string, any>) {
 
       const key = paramName ?? name;
 
-      if (([OPERATORS.contains, OPERATORS.doesNotContain] as Operator[]).includes(operator)) {
+      if (SEARCH_OPERATORS.has(operator)) {
         obj[key] = `%${value}%`;
-      } else if (([OPERATORS.equals, OPERATORS.notEquals] as Operator[]).includes(operator)) {
+      } else if (EQUALS_OPERATORS.has(operator)) {
         obj[key] = Array.isArray(value) ? value : [value];
       } else {
         obj[key] = value;
@@ -232,7 +242,7 @@ function getQueryParams(filters: Record<string, any>) {
 function parseFilters(filters: Record<string, any>, options?: QueryOptions) {
   const joinSession = Object.keys(filters).find(key => {
     const baseName = key.replace(/\d+$/, '');
-    return ['referrer', ...SESSION_COLUMNS].includes(baseName);
+    return JOIN_SESSION_FILTERS.has(baseName);
   });
 
   const cohortFilters = Object.fromEntries(

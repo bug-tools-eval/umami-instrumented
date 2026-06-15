@@ -1,5 +1,6 @@
 'use client';
 import { Grid } from '@umami/react-zen';
+import { useMemo } from 'react';
 import { firstBy } from 'thenby';
 import { GridRow } from '@/components/common/GridRow';
 import { PageBody } from '@/components/common/PageBody';
@@ -18,15 +19,21 @@ export function RealtimePage({ websiteId }: { websiteId: string }) {
   const { data, isLoading, error } = useRealtimeQuery(websiteId);
   const { isMobile } = useMobile();
 
+  const countries = useMemo(
+    () =>
+      data
+        ? percentFilter(
+            Object.keys(data.countries)
+              .map(key => ({ x: key, y: data.countries[key] }))
+              .sort(firstBy('y', -1)),
+          )
+        : [],
+    [data],
+  );
+
   if (isLoading || error) {
     return <PageBody isLoading={isLoading} error={error} />;
   }
-
-  const countries = percentFilter(
-    Object.keys(data.countries)
-      .map(key => ({ x: key, y: data.countries[key] }))
-      .sort(firstBy('y', -1)),
-  );
 
   return (
     <Grid gap="3">
